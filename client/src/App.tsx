@@ -17,6 +17,7 @@ const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
 const DashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
 const EventsAdminPage = lazy(() => import('./pages/admin/EventsAdminPage'));
 const AdminSlotsPage = lazy(() => import('./pages/admin/AdminSlotsPage'));
+const AdminEmailPage = lazy(() => import('./pages/admin/AdminEmailPage'));
 const EventTypesPage = lazy(() => import('./pages/admin/EventTypesPage'));
 const SceneriesPage = lazy(() => import('./pages/admin/SceneriesPage'));
 const SimulatorsPage = lazy(() => import('./pages/admin/SimulatorsPage'));
@@ -57,6 +58,7 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="events" element={<EventsAdminPage />} />
           <Route path="events/:eventId/slots" element={<AdminSlotsPage />} />
+          <Route path="events/:eventId/email" element={<AdminEmailPage />} />
           <Route path="event-types" element={<EventTypesPage />} />
           <Route path="sceneries" element={<SceneriesPage />} />
           <Route path="simulators" element={<SimulatorsPage />} />

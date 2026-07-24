@@ -89,6 +89,12 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
   const set = (k: string) => (e: any) => setF((s) => ({ ...s, [k]: e.target.value }));
   const setVal = (k: string) => (v: string) => setF((s) => ({ ...s, [k]: v }));
   const setBool = (k: string) => (v: boolean) => setF((s) => ({ ...s, [k]: v }));
+  // Date/time are stored as "YYYY-MM-DDTHH:mm" (UTC). Split into a date picker + a
+  // 24-hour time field so the input is unambiguous UTC 24h, not locale 12h.
+  const dayPart = (v: string) => (v || '').slice(0, 10);
+  const timePart = (v: string) => (v || '').slice(11, 16);
+  const setDay = (k: 'dateStart' | 'dateEnd') => (day: string) => setF((s) => ({ ...s, [k]: `${day}T${timePart(s[k]) || '00:00'}` }));
+  const setTime = (k: 'dateStart' | 'dateEnd') => (tm: string) => setF((s) => ({ ...s, [k]: `${dayPart(s[k])}T${tm}` }));
 
   return (
     <Modal open onClose={onClose} title={editing ? 'Edit event' : 'Create event'} maxWidth="max-w-2xl">
@@ -133,13 +139,31 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
               ]}
             />
           </div>
-          <div>
-            <label className="label">Start (UTC)</label>
-            <input type="datetime-local" className="input" value={f.dateStart} onChange={set('dateStart')} required />
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <div>
+              <label className="label">Start date (UTC)</label>
+              <input type="date" lang="en-GB" className="input" value={dayPart(f.dateStart)} onChange={(e) => setDay('dateStart')(e.target.value)} required />
+            </div>
+            <div>
+              <label className="label">Time (UTC, 24h)</label>
+              <input type="text" inputMode="numeric" placeholder="HH:MM" maxLength={5}
+                pattern="([01][0-9]|2[0-3]):[0-5][0-9]" title="24-hour UTC time, e.g. 16:00"
+                className="input w-24 text-center font-mono" value={timePart(f.dateStart)}
+                onChange={(e) => setTime('dateStart')(e.target.value)} required />
+            </div>
           </div>
-          <div>
-            <label className="label">End (UTC)</label>
-            <input type="datetime-local" className="input" value={f.dateEnd} onChange={set('dateEnd')} required />
+          <div className="grid grid-cols-[1fr_auto] gap-2">
+            <div>
+              <label className="label">End date (UTC)</label>
+              <input type="date" lang="en-GB" className="input" value={dayPart(f.dateEnd)} onChange={(e) => setDay('dateEnd')(e.target.value)} required />
+            </div>
+            <div>
+              <label className="label">Time (UTC, 24h)</label>
+              <input type="text" inputMode="numeric" placeholder="HH:MM" maxLength={5}
+                pattern="([01][0-9]|2[0-3]):[0-5][0-9]" title="24-hour UTC time, e.g. 16:00"
+                className="input w-24 text-center font-mono" value={timePart(f.dateEnd)}
+                onChange={(e) => setTime('dateEnd')(e.target.value)} required />
+            </div>
           </div>
         </div>
         <div>
@@ -256,6 +280,9 @@ export default function EventsAdminPage() {
                 <div className="flex gap-1.5">
                   <Link to={`/admin/events/${ev.id}/slots`} className="btn-secondary px-3 py-1.5 text-xs">
                     Manage slots
+                  </Link>
+                  <Link to={`/admin/events/${ev.id}/email`} className="btn-secondary px-3 py-1.5 text-xs">
+                    Email
                   </Link>
                   <button className="btn-secondary px-3 py-1.5 text-xs" onClick={() => setModal({ open: true, editing: ev })}>
                     Edit

@@ -7,7 +7,6 @@ import { Checkbox } from '@ivao/atmosphere-react';
 import { PageLoader, EmptyState, Pagination } from '../../components/ui';
 import { SlotList } from '../../components/SlotList';
 import { AdminSlotPanel } from '../../components/AdminSlotPanel';
-import { EmailPanel } from '../../components/EmailPanel';
 import { fmtDateUtc, fmtTimeUtc } from '../../lib/format';
 
 const OPS_TYPES = [
@@ -60,7 +59,6 @@ export default function AdminSlotsPage() {
         </p>
       </div>
 
-      <EmailPanel event={event} />
       <AdminSlotPanel event={event} />
 
       {/* Filters */}

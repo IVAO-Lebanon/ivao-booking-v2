@@ -1,19 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Mail, Megaphone, FileText, Bell, Send, TriangleAlert } from 'lucide-react';
+import { Mail, Megaphone, Bell, Send, TriangleAlert } from 'lucide-react';
 import { Switch } from '@ivao/atmosphere-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import type { EmailFields, EmailStatus, EventModel } from '../api/types';
 import { Modal, Spinner } from './ui';
 import { useToast } from './Toast';
-import { useConfirm } from './Confirm';
 import { friendlyError } from '../lib/format';
 
-type Mode = 'reminder' | 'report' | 'notam';
+type Mode = 'reminder' | 'notam';
 
 const MODE_META: Record<Mode, { title: string; audience: (s: EmailStatus) => string; once: boolean }> = {
   reminder: { title: 'Reminder to pilots who booked', audience: (s) => `${s.participantCount} pilot(s) who booked`, once: true },
-  report: { title: 'Report to events department', audience: (s) => s.eventsDept || 'events department', once: true },
   notam: { title: 'NOTAM to participating pilots', audience: (s) => `${s.participantCount} participant(s)`, once: false },
 };
 
@@ -21,11 +19,7 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
   const toast = useToast();
   const qc = useQueryClient();
   const msgRef = useRef<HTMLTextAreaElement>(null);
-  const isReport = mode === 'report';
-  const [f, setF] = useState<EmailFields>(() => ({
-    ...status.defaults[mode],
-    to: isReport ? status.eventsDept || '' : undefined,
-  }));
+  const [f, setF] = useState<EmailFields>(() => ({ ...status.defaults[mode] }));
   const set = <K extends keyof EmailFields>(k: K, v: EmailFields[K]) => setF((p) => ({ ...p, [k]: v }));
   const [preview, setPreview] = useState('');
 
@@ -48,11 +42,7 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
   };
 
   const send = useMutation({
-    mutationFn: () => {
-      if (mode === 'reminder') return api.sendReminder(event.id, f);
-      if (mode === 'report') return api.sendReport(event.id, f);
-      return api.sendNotam(event.id, f);
-    },
+    mutationFn: () => (mode === 'reminder' ? api.sendReminder(event.id, f) : api.sendNotam(event.id, f)),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['email-status', event.id] });
       toast.success(`Sent ${r.sent}/${r.total}${r.failed ? ` · ${r.failed} failed` : ''}.`);
@@ -90,16 +80,15 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
           {/* Editor — everything is editable */}
           <div className="max-h-[460px] space-y-3 overflow-y-auto scroll-thin pr-1">
             {field('subject', 'Subject', '{{eventName}}')}
-            {isReport && field('to', 'Send to', 'events@yourdivision.ivao.aero')}
             <div className="grid grid-cols-2 gap-3">
               {field('headerTag', 'Header tag', 'Events')}
-              {!isReport && field('label', 'Eyebrow label', 'Event NOTAM')}
+              {field('label', 'Eyebrow label', 'Event NOTAM')}
             </div>
-            {!isReport && field('title', 'Heading', '{{eventName}}')}
-            {!isReport && field('greeting', 'Greeting', 'Dear {{pilotName}},')}
+            {field('title', 'Heading', '{{eventName}}')}
+            {field('greeting', 'Greeting', 'Dear {{pilotName}},')}
 
             <div>
-              <label className="label">{isReport ? 'Intro message (bookings table + CSV are added automatically)' : 'Message'}</label>
+              <label className="label">Message</label>
               <textarea ref={msgRef} className="input min-h-[130px] text-sm leading-relaxed" value={f.message} onChange={(e) => set('message', e.target.value)}
                 placeholder="Plain text. Leave a blank line to start a new paragraph." />
             </div>
@@ -116,21 +105,18 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
               </div>
             </div>
 
-            {!isReport && (
-              <div className="flex flex-wrap gap-4 rounded-lg bg-fuselage-50 p-3 dark:bg-fuselage-800/50">
-                {mode === 'notam' && toggle('showFlightCard', 'Flight card')}
-                {mode === 'reminder' && toggle('showEventStrip', 'Event date/time')}
-                {toggle('ctaShow', 'Button')}
-              </div>
-            )}
-            {!isReport && f.ctaShow && (
+            <div className="flex flex-wrap gap-4 rounded-lg bg-fuselage-50 p-3 dark:bg-fuselage-800/50">
+              {mode === 'notam' && toggle('showFlightCard', 'Flight card')}
+              {mode === 'reminder' && toggle('showEventStrip', 'Event date/time')}
+              {toggle('ctaShow', 'Button')}
+            </div>
+            {f.ctaShow && (
               <div className="grid grid-cols-2 gap-3">
                 {field('ctaLabel', 'Button label', 'Book your slot')}
                 {field('ctaUrl', 'Button link (URL)', 'https://…')}
               </div>
             )}
             {field('footerNote', 'Footer note (optional)', 'e.g. Questions? Reply to this email.')}
-            {isReport && <p className="text-[11px] text-fuselage-400">A <b>bookings.csv</b> file is attached automatically.</p>}
           </div>
 
           {/* Live preview */}
@@ -144,7 +130,7 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
         </div>
 
         <div className="flex pt-1">
-          <button className="btn-primary ml-auto" onClick={() => send.mutate()} disabled={send.isPending || (isReport && !(f.to || '').trim())}>
+          <button className="btn-primary ml-auto" onClick={() => send.mutate()} disabled={send.isPending}>
             {send.isPending ? <Spinner /> : <><Send size={15} /> Send to {MODE_META[mode].audience(status)}</>}
           </button>
         </div>
@@ -172,7 +158,6 @@ export function EmailPanel({ event }: { event: EventModel }) {
           <Mail size={13} /> Email
         </span>
         <Btn m="reminder" icon={<Bell size={14} />} label={status.reminderSent ? 'Reminder sent' : 'Send reminder'} disabled={status.reminderSent} />
-        <Btn m="report" icon={<FileText size={14} />} label={status.reportSent ? 'Report sent' : 'Email report'} disabled={status.reportSent} />
         <Btn m="notam" icon={<Megaphone size={14} />} label="Send NOTAM" />
         {!status.configured && <span className="ml-auto text-[11px] text-warning-600">SMTP not configured (preview mode)</span>}
       </div>

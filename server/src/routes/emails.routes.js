@@ -219,34 +219,6 @@ router.post(
 );
 
 router.post(
-  '/event/:eventId/email/report',
-  ...adminOnly,
-  asyncHandler(async (req, res) => {
-    const event = await getEventOr404(req.params.eventId);
-    const opts = { ...composerDefaults.report, ...(req.body || {}) };
-    const to = (opts.to || config.email.eventsDept || '').trim();
-    if (!to) throw new ApiError(422, 'email.noEventsDept');
-
-    const claimId = await claimOnce(event.id, 'report', opts.subject || `Bookings report for ${event.eventName}`, req.user.id);
-    try {
-      const bookings = await loadBookings(event.id);
-      const { subject, html } = composeFor('report', opts, eventCtx(event), event, bookings);
-      const csv = bookingsCsv(bookings);
-      const result = await sendBulk([
-        { to, subject, html, attachments: [{ filename: `bookings_${event.eventName.replace(/[^\w]+/g, '_')}.csv`, content: csv, contentType: 'text/csv' }] },
-      ]);
-      if (result.sent === 0) { await releaseOnce(claimId); throw new ApiError(502, 'email.sendFailed'); }
-      await finalize(claimId, result);
-      await audit(req.user.id, 'email:report', 'event', event.id, { to, sent: result.sent });
-      res.json(result);
-    } catch (err) {
-      if (!(err instanceof ApiError)) await releaseOnce(claimId).catch(() => {});
-      throw err;
-    }
-  })
-);
-
-router.post(
   '/event/:eventId/email/notam',
   ...adminOnly,
   asyncHandler(async (req, res) => {
