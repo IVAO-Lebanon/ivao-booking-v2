@@ -9,6 +9,7 @@ import MyBookingsPage from './pages/MyBookingsPage';
 import LoginPage from './pages/LoginPage';
 import LoginCallbackPage from './pages/LoginCallbackPage';
 import NotFoundPage from './pages/NotFoundPage';
+import SpikePage from './pages/SpikePage';
 import AdminLayout from './pages/admin/AdminLayout';
 import DashboardPage from './pages/admin/DashboardPage';
 import EventsAdminPage from './pages/admin/EventsAdminPage';
@@ -44,6 +45,7 @@ export default function App() {
       <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/login/callback" element={<LoginCallbackPage />} />
+      <Route path="/spike" element={<SpikePage />} />
       <Route element={<Layout />}>
         <Route index element={<EventsPage />} />
         <Route path="events/:id" element={<EventDetailPage />} />
