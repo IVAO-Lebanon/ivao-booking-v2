@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../../api/client';
 import type { Scenery } from '../../api/types';
+import { Select } from '@ivao/atmosphere-react';
 import { Modal, Spinner, PageLoader, EmptyState, Pagination } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { useConfirm } from '../../components/Confirm';
@@ -25,6 +26,7 @@ function SceneryForm({ editing, onClose }: { editing: Scenery | null; onClose: (
     onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
   });
   const set = (k: string) => (e: any) => setF((s: any) => ({ ...s, [k]: e.target.value }));
+  const setVal = (k: string) => (v: string) => setF((s: any) => ({ ...s, [k]: v }));
 
   return (
     <Modal open onClose={onClose} title={editing ? 'Edit scenery' : 'Add scenery'}>
@@ -36,13 +38,12 @@ function SceneryForm({ editing, onClose }: { editing: Scenery | null; onClose: (
           </div>
           <div>
             <label className="label">Simulator</label>
-            <select className="input" value={f.simulator} onChange={set('simulator')}>
-              {(sims ?? []).map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <Select
+              value={f.simulator}
+              onValueChange={setVal('simulator')}
+              placeholder="Select simulator"
+              items={(sims ?? []).map((s) => ({ value: s.code, label: s.name }))}
+            />
           </div>
         </div>
         <div>
@@ -51,10 +52,15 @@ function SceneryForm({ editing, onClose }: { editing: Scenery | null; onClose: (
         </div>
         <div>
           <label className="label">License</label>
-          <select className="input" value={f.license} onChange={set('license')}>
-            <option value="freeware">Freeware</option>
-            <option value="payware">Payware</option>
-          </select>
+          <Select
+            value={f.license}
+            onValueChange={setVal('license')}
+            placeholder="Select license"
+            items={[
+              { value: 'freeware', label: 'Freeware' },
+              { value: 'payware', label: 'Payware' },
+            ]}
+          />
         </div>
         <div>
           <label className="label">Download link</label>

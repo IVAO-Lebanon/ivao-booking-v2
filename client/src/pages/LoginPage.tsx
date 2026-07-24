@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toast';
+import { Switch } from '@ivao/atmosphere-react';
 import { Spinner, IvaoMark } from '../components/ui';
 import { apiErrorMessage } from '../api/client';
 import { friendlyError } from '../lib/format';
@@ -76,7 +77,7 @@ export default function LoginPage() {
                   <input className="input" value={vid} onChange={(e) => setVid(e.target.value)} placeholder="540001" />
                 </div>
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={admin} onChange={(e) => setAdmin(e.target.checked)} />
+                  <Switch checked={admin} onCheckedChange={setAdmin} />
                   Sign in as division staff (admin)
                 </label>
                 <button className="btn-secondary w-full" disabled={busy}>

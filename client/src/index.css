@@ -18,7 +18,10 @@ body,
     font-feature-settings: 'cv05' 1, 'ss01' 1;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-head tracking-tight;
+    /* Inherit the surrounding text color so headings over coloured backgrounds
+       (hero banners, etc.) stay legible. Atmosphere's base CSS otherwise forces
+       a fixed dark heading color that blocks inherited `text-white`. */
+    @apply font-head tracking-tight text-inherit;
   }
   ::selection {
     @apply bg-atmos-500/25;

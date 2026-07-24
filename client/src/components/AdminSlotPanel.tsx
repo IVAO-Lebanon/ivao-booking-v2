@@ -3,6 +3,7 @@ import { Plus, Upload, Download, TriangleAlert, CircleCheck, Plane, FileSpreadsh
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import type { EventModel, Slot } from '../api/types';
+import { Switch } from '@ivao/atmosphere-react';
 import { Modal, Spinner } from './ui';
 import { useToast } from './Toast';
 import { friendlyError, fmtUtc } from '../lib/format';
@@ -78,7 +79,7 @@ function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () =>
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={f.isPrivate} onChange={(e) => setF((s) => ({ ...s, isPrivate: e.target.checked }))} />
+          <Switch checked={f.isPrivate} onCheckedChange={(v) => setF((s) => ({ ...s, isPrivate: v }))} />
           Private slot
         </label>
         <div className="flex gap-2 pt-2">
