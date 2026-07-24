@@ -1,5 +1,6 @@
-import { ReactNode, useEffect } from 'react';
-import { PlaneLanding, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ReactNode } from 'react';
+import { PlaneLanding, ChevronLeft, ChevronRight } from 'lucide-react';
+import { DialogRoot, DialogContent, DialogTitle, DialogTopRightClose } from '@ivao/atmosphere-react';
 
 /**
  * IVAO globe mark — a simplified rendition of the IVAO brand logo
@@ -79,6 +80,9 @@ export function StatusBadge({ status }: { status: string }) {
   return <span className={`badge badge-dot ${meta.badge}`}>{meta.label}</span>;
 }
 
+// Backed by Atmosphere's Radix Dialog (focus-trap, Esc-to-close, scroll-lock,
+// ARIA all handled for us). The props API is unchanged so every existing
+// <Modal open onClose title maxWidth> call site keeps working as-is.
 export function Modal({
   open,
   onClose,
@@ -92,33 +96,14 @@ export function Modal({
   children: ReactNode;
   maxWidth?: string;
 }) {
-  useEffect(() => {
-    if (!open) return;
-    const onEsc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', onEsc);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onEsc);
-      document.body.style.overflow = '';
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onClick={onClose}>
-      <div
-        className={`card w-full ${maxWidth} max-h-[92vh] overflow-y-auto rounded-b-none rounded-t-2xl sm:rounded-2xl`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 flex items-center justify-between border-b border-fuselage-200 bg-white/90 px-5 py-4 backdrop-blur dark:border-fuselage-800 dark:bg-fuselage-900/90">
-          <h3 className="text-lg font-bold">{title}</h3>
-          <button className="btn-ghost -mr-2 p-1.5" onClick={onClose} aria-label="Close">
-            <X size={20} />
-          </button>
-        </div>
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
+    <DialogRoot open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className={`${maxWidth} max-h-[92vh] w-[calc(100%-2rem)] overflow-y-auto`}>
+        <DialogTopRightClose />
+        <DialogTitle className="mb-4 pr-8 font-head text-lg font-bold">{title}</DialogTitle>
+        {children}
+      </DialogContent>
+    </DialogRoot>
   );
 }
 
