@@ -11,9 +11,8 @@ import LoginPage from './pages/LoginPage';
 import LoginCallbackPage from './pages/LoginCallbackPage';
 import NotFoundPage from './pages/NotFoundPage';
 
-// Code-split the admin section and the spike so they leave the initial bundle
-// (offsets the weight Atmosphere + Radix add to the shared vendor chunk).
-const SpikePage = lazy(() => import('./pages/SpikePage'));
+// Code-split the admin section so it leaves the initial bundle (offsets the
+// weight Atmosphere + Radix add to the shared vendor chunk).
 const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
 const DashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
 const EventsAdminPage = lazy(() => import('./pages/admin/EventsAdminPage'));
@@ -50,7 +49,6 @@ export default function App() {
       <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/login/callback" element={<LoginCallbackPage />} />
-      <Route path="/spike" element={<SpikePage />} />
       <Route element={<Layout />}>
         <Route index element={<EventsPage />} />
         <Route path="events/:id" element={<EventDetailPage />} />
