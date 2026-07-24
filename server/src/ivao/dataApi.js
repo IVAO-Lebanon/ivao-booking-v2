@@ -87,17 +87,71 @@ export async function getAircraft(icao) {
   return data;
 }
 
-// Full reference lists (large — only fetched by the periodic sync, never per request).
-export async function getAllAirports() {
-  const res = await ivaoGet('/airports/all');
-  if (!res.ok) throw new Error(`airports/all ${res.status}`);
-  return res.json();
+// Full reference catalogues, fetched from IVAO and cached in memory (24h). We do
+// NOT persist these in our own DB — the IVAO API is the source of truth; this is
+// just a transient cache so typeahead searches don't refetch the whole list.
+const catalogueCache = makeCache();
+async function getCatalogue(kind, path) {
+  const cached = catalogueCache.get(kind);
+  if (cached) return cached.data;
+  const res = await ivaoGet(path);
+  if (!res.ok) throw new Error(`${path} ${res.status}`);
+  const body = await res.json();
+  const list = Array.isArray(body) ? body : body?.items || [];
+  catalogueCache.set(kind, list, DAY);
+  return list;
 }
 
-export async function getAllAircraft() {
-  const res = await ivaoGet('/aircrafts/all');
-  if (!res.ok) throw new Error(`aircrafts/all ${res.status}`);
-  return res.json();
+export const getAllAirports = () => getCatalogue('airports', '/airports/all');
+export const getAllAircraft = () => getCatalogue('aircraft', '/aircrafts/all');
+
+const mapAirport = (a) => ({ icao: a.icao, iata: a.iata || null, name: a.name || a.icao, city: a.city || null, countryId: a.countryId || null });
+const mapAircraftType = (a) => ({ icao: a.icaoCode, iata: a.iataCode || null, model: a.model || a.icaoCode, description: a.description || null, wtc: a.wakeTurbulence || null, manufacturer: a.manufacture?.name || null });
+
+/** Airport typeahead (ICAO prefix or name substring), ranked, from the cached IVAO catalogue. */
+export async function searchAirports(q) {
+  const s = String(q || '').trim();
+  if (s.length < 2) return [];
+  const up = s.toUpperCase();
+  const lower = s.toLowerCase();
+  const list = await getAllAirports();
+  const scored = [];
+  for (const a of list) {
+    if (!a || !a.icao) continue;
+    const icao = String(a.icao).toUpperCase();
+    const prefix = icao.startsWith(up);
+    if (!prefix && !icao.includes(up) && !String(a.name || '').toLowerCase().includes(lower)) continue;
+    scored.push({ rank: icao === up ? 0 : prefix ? 1 : 2, a });
+  }
+  scored.sort((x, y) => x.rank - y.rank || String(x.a.name || '').localeCompare(String(y.a.name || '')));
+  return scored.slice(0, 20).map(({ a }) => mapAirport(a));
+}
+
+/** Aircraft-type typeahead (ICAO prefix or model substring) from the cached IVAO catalogue. */
+export async function searchAircraft(q) {
+  const s = String(q || '').trim();
+  if (!s) return [];
+  const up = s.toUpperCase();
+  const lower = s.toLowerCase();
+  const list = await getAllAircraft();
+  const scored = [];
+  for (const a of list) {
+    if (!a || !a.icaoCode) continue;
+    const icao = String(a.icaoCode).toUpperCase();
+    const prefix = icao.startsWith(up);
+    if (!prefix && !String(a.model || '').toLowerCase().includes(lower)) continue;
+    scored.push({ rank: icao === up ? 0 : prefix ? 1 : 2, a });
+  }
+  scored.sort((x, y) => x.rank - y.rank || String(x.a.icaoCode).localeCompare(String(y.a.icaoCode)));
+  return scored.slice(0, 20).map(({ a }) => mapAircraftType(a));
+}
+
+/** Single aircraft type by ICAO, from the cached IVAO catalogue. */
+export async function getAircraftType(icao) {
+  const up = String(icao || '').toUpperCase();
+  const list = await getAllAircraft();
+  const a = list.find((x) => String(x.icaoCode).toUpperCase() === up);
+  return a ? mapAircraftType(a) : { icao: up, available: false };
 }
 
 const routeCache = makeCache();

@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import { query, queryOne } from '../db/pool.js';
 import { asyncHandler, ApiError } from '../middleware/error.js';
-import { getRoutes, getTextureImage, getAirlineTextures, hasApiKey } from '../ivao/dataApi.js';
+import { getRoutes, getTextureImage, getAirlineTextures, searchAircraft, getAircraftType, hasApiKey } from '../ivao/dataApi.js';
 
 const router = Router();
 
@@ -16,34 +15,28 @@ function pickLivery(textures) {
   return pool[0] || null;
 }
 
-// Aircraft typeahead over the synced catalogue.
+// Aircraft typeahead — served live from the IVAO aircraft catalogue (cached in memory).
 router.get(
   '/aircraft',
   asyncHandler(async (req, res) => {
     const q = String(req.query.search || '').trim();
-    if (q.length < 1) return res.json([]);
+    if (q.length < 1 || !hasApiKey()) return res.json([]);
     try {
-      const rows = await query(
-        `SELECT icao, iata, model, description, wtc, manufacturer FROM aircraft_ref
-         WHERE icao LIKE :prefix OR model LIKE :contains
-         ORDER BY (icao = :exact) DESC, icao LIMIT 20`,
-        { prefix: `${q.toUpperCase()}%`, contains: `%${q}%`, exact: q.toUpperCase() }
-      );
-      res.json(rows);
+      res.json(await searchAircraft(q));
     } catch {
       res.json([]);
     }
   })
 );
 
-// Single aircraft type (for the flight detail view).
+// Single aircraft type (for the flight detail view) — from the IVAO catalogue.
 router.get(
   '/aircraft/:icao',
   asyncHandler(async (req, res) => {
     const icao = String(req.params.icao || '').toUpperCase();
+    if (!hasApiKey()) return res.json({ icao, available: false });
     try {
-      const row = await queryOne('SELECT icao, iata, model, description, wtc, manufacturer FROM aircraft_ref WHERE icao = :i', { i: icao });
-      res.json(row || { icao, available: false });
+      res.json(await getAircraftType(icao));
     } catch {
       res.json({ icao, available: false });
     }

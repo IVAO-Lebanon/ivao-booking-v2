@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 import { config } from './config.js';
 import { pool } from './db/pool.js';
-import { runSync } from './ivao/sync.js';
+import { getAllAirports, getAllAircraft, hasApiKey } from './ivao/dataApi.js';
 import { errorHandler, notFound } from './middleware/error.js';
 
 import authRoutes from './routes/auth.routes.js';
@@ -118,10 +118,13 @@ async function start() {
     // eslint-disable-next-line no-console
     console.log(`🛫 IVAO ${config.division} Booking API listening on http://localhost:${config.port}`);
   });
-  // Load IVAO airport/aircraft reference data in the background (fills empty tables
-  // on boot, then refreshes daily). Never blocks startup.
-  runSync();
-  setInterval(() => runSync({ force: true }), 24 * 60 * 60 * 1000);
+  // Warm the IVAO airport/aircraft catalogues into memory (no DB storage) so the
+  // first typeahead search is instant. Fetched from the IVAO API; cached 24h and
+  // refreshed lazily on demand. Never blocks startup.
+  if (hasApiKey()) {
+    getAllAirports().then((l) => console.log(`✈️  ${l.length} airports available from IVAO`)).catch(() => {});
+    getAllAircraft().then((l) => console.log(`🛩️  ${l.length} aircraft available from IVAO`)).catch(() => {});
+  }
 }
 
 start();

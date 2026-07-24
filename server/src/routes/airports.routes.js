@@ -1,7 +1,6 @@
 import { Router } from 'express';
-import { query } from '../db/pool.js';
 import { asyncHandler, ApiError } from '../middleware/error.js';
-import { getAirport, getAirportBrief, hasApiKey } from '../ivao/dataApi.js';
+import { getAirport, getAirportBrief, searchAirports, hasApiKey } from '../ivao/dataApi.js';
 
 const router = Router();
 
@@ -11,22 +10,16 @@ function assertIcao(raw) {
   return icao;
 }
 
-// Typeahead search over the synced airport catalogue (by ICAO or name).
+// Typeahead search over the IVAO airport catalogue (cached in memory, by ICAO or name).
 router.get(
   '/',
   asyncHandler(async (req, res) => {
     const q = String(req.query.search || '').trim();
-    if (q.length < 2) return res.json([]);
+    if (q.length < 2 || !hasApiKey()) return res.json([]);
     try {
-      const rows = await query(
-        `SELECT icao, iata, name, city, countryId FROM airports_ref
-         WHERE icao LIKE :prefix OR name LIKE :contains
-         ORDER BY (icao = :exact) DESC, (icao LIKE :prefix) DESC, name LIMIT 20`,
-        { prefix: `${q.toUpperCase()}%`, contains: `%${q}%`, exact: q.toUpperCase() }
-      );
-      res.json(rows);
+      res.json(await searchAirports(q));
     } catch {
-      res.json([]); // reference table not synced yet
+      res.json([]); // IVAO catalogue unavailable
     }
   })
 );
