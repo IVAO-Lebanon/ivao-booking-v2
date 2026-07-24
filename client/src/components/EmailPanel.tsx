@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Mail, Megaphone, FileText, Bell, Send, TriangleAlert } from 'lucide-react';
+import { Switch } from '@ivao/atmosphere-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import type { EmailFields, EmailStatus, EventModel } from '../api/types';
@@ -68,7 +69,7 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
   );
   const toggle = (k: keyof EmailFields, label: string) => (
     <label className="flex items-center gap-2 text-sm">
-      <input type="checkbox" checked={Boolean(f[k])} onChange={(e) => set(k, e.target.checked as EmailFields[typeof k])} />
+      <Switch checked={Boolean(f[k])} onCheckedChange={(v) => set(k, v as EmailFields[typeof k])} />
       {label}
     </label>
   );

@@ -3,6 +3,7 @@ import { Plus, Trash2, Route } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../../api/client';
 import type { EventTypeModel } from '../../api/types';
+import { Switch } from '@ivao/atmosphere-react';
 import { Modal, Spinner, PageLoader, EmptyState } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { useConfirm } from '../../components/Confirm';
@@ -61,7 +62,7 @@ function TypeForm({ editing, onClose }: { editing: EventTypeModel | null; onClos
           <input className="input" value={f.description} onChange={(e) => setF((s) => ({ ...s, description: e.target.value }))} placeholder="Short summary shown to staff." />
         </div>
         <label className="flex items-start gap-2 rounded-lg bg-fuselage-50 p-3 text-sm dark:bg-fuselage-800/60">
-          <input type="checkbox" className="mt-0.5" checked={f.opsSlots} onChange={(e) => setF((s) => ({ ...s, opsSlots: e.target.checked }))} />
+          <Switch className="mt-0.5" checked={f.opsSlots} onCheckedChange={(v) => setF((s) => ({ ...s, opsSlots: v }))} />
           <span>
             <span className="font-semibold">Ops-style slots</span>
             <span className="block text-xs text-fuselage-500">

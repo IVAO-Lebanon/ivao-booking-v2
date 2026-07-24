@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../../api/client';
 import type { EventModel } from '../../api/types';
+import { Select, Switch } from '@ivao/atmosphere-react';
 import { Modal, Spinner, PageLoader, EmptyState, StatusBadge, Pagination } from '../../components/ui';
 import { Plus } from 'lucide-react';
 import { useToast } from '../../components/Toast';
@@ -86,6 +87,8 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
   });
 
   const set = (k: string) => (e: any) => setF((s) => ({ ...s, [k]: e.target.value }));
+  const setVal = (k: string) => (v: string) => setF((s) => ({ ...s, [k]: v }));
+  const setBool = (k: string) => (v: boolean) => setF((s) => ({ ...s, [k]: v }));
 
   return (
     <Modal open onClose={onClose} title={editing ? 'Edit event' : 'Create event'} maxWidth="max-w-2xl">
@@ -107,22 +110,26 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Type</label>
-            <select className="input" value={f.type} onChange={set('type')}>
-              {(eventTypes ?? []).map((t) => (
-                <option key={t.code} value={t.code}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
+            <Select
+              value={f.type}
+              onValueChange={setVal('type')}
+              placeholder="Select type"
+              items={(eventTypes ?? []).map((t) => ({ value: t.code, label: t.name }))}
+            />
           </div>
           <div>
             <label className="label">Status</label>
-            <select className="input" value={f.status} onChange={set('status')}>
-              <option value="created">Created</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="finished">Finished</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
+            <Select
+              value={f.status}
+              onValueChange={setVal('status')}
+              placeholder="Select status"
+              items={[
+                { value: 'created', label: 'Created' },
+                { value: 'scheduled', label: 'Scheduled' },
+                { value: 'finished', label: 'Finished' },
+                { value: 'cancelled', label: 'Cancelled' },
+              ]}
+            />
           </div>
           <div>
             <label className="label">Start (UTC)</label>
@@ -170,25 +177,17 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
             placeholder="e.g. Please file the published route and connect 15 min before your slot."
           />
         </div>
-        <div className="flex flex-wrap gap-4 pt-1">
+        <div className="flex flex-wrap gap-x-6 gap-y-3 pt-1">
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={f.publicAccess} onChange={(e) => setF((s) => ({ ...s, publicAccess: e.target.checked }))} />
+            <Switch checked={f.publicAccess} onCheckedChange={setBool('publicAccess')} />
             Public access
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={f.allowBookingAfterStart}
-              onChange={(e) => setF((s) => ({ ...s, allowBookingAfterStart: e.target.checked }))}
-            />
+            <Switch checked={f.allowBookingAfterStart} onCheckedChange={setBool('allowBookingAfterStart')} />
             Allow booking after start
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={f.useIvaoRoutes}
-              onChange={(e) => setF((s) => ({ ...s, useIvaoRoutes: e.target.checked }))}
-            />
+            <Switch checked={f.useIvaoRoutes} onCheckedChange={setBool('useIvaoRoutes')} />
             Offer IVAO-published routes
           </label>
         </div>

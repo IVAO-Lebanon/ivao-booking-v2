@@ -3,6 +3,7 @@ import { Plane, Trash2, Pencil, Lock, LockOpen, Clock, X } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import type { EventModel, Slot } from '../api/types';
+import { Switch, Checkbox } from '@ivao/atmosphere-react';
 import { StatusBadge, statusRail, Modal, Spinner } from './ui';
 import { FlightDetailModal } from './FlightDetailModal';
 import { liveStatus, LiveFlightChip } from './LiveEventBoard';
@@ -99,7 +100,7 @@ function EditSlotModal({ event, slot, onClose }: { event: EventModel; slot: Slot
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={f.isPrivate} onChange={(e) => setF((s) => ({ ...s, isPrivate: e.target.checked }))} />
+          <Switch checked={f.isPrivate} onCheckedChange={(v) => setF((s) => ({ ...s, isPrivate: v }))} />
           Private slot
         </label>
         <div className="flex gap-2 pt-2">
@@ -293,7 +294,7 @@ export function SlotList({
       <div className="hidden grid-cols-12 gap-3 px-4 pb-1 font-mono text-[11px] font-bold uppercase tracking-[0.15em] text-fuselage-400 md:grid">
         <div className="col-span-2 flex items-center gap-2">
           {isAdmin && (
-            <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all slots" className="cursor-pointer" />
+            <Checkbox checked={allSelected} onCheckedChange={() => toggleAll()} aria-label="Select all slots" className="cursor-pointer" />
           )}
           Callsign
         </div>
@@ -314,10 +315,9 @@ export function SlotList({
           {/* Callsign (+ admin select) */}
           <div className="flex items-center gap-2 md:col-span-2">
             {isAdmin && (
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={selected.has(slot.id)}
-                onChange={() => toggle(slot.id)}
+                onCheckedChange={() => toggle(slot.id)}
                 aria-label={`Select slot ${slot.flightNumber || slot.id}`}
                 className="cursor-pointer"
               />

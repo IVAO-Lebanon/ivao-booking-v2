@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
+import { Checkbox } from '@ivao/atmosphere-react';
 import { PageLoader, EmptyState, Pagination } from '../../components/ui';
 import { SlotList } from '../../components/SlotList';
 import { AdminSlotPanel } from '../../components/AdminSlotPanel';
@@ -65,7 +66,7 @@ export default function AdminSlotsPage() {
       {/* Filters */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={available} onChange={(e) => { setAvailable(e.target.checked); setPage(1); }} />
+          <Checkbox checked={available} onCheckedChange={(v) => { setAvailable(v === true); setPage(1); }} />
           Available only
         </label>
         <input

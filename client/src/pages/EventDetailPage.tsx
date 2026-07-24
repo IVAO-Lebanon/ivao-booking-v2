@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { Slot } from '../api/types';
+import { Checkbox } from '@ivao/atmosphere-react';
 import { PageLoader, EmptyState, StatusBadge, Pagination } from '../components/ui';
 import { SlotList } from '../components/SlotList';
 import { BookSlotModal } from '../components/BookSlotModal';
@@ -226,7 +227,7 @@ export default function EventDetailPage() {
           {tab === 'all' && (
             <>
               <label className="ml-auto flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={available} onChange={(e) => { setAvailable(e.target.checked); setPage(1); }} />
+                <Checkbox checked={available} onCheckedChange={(v) => { setAvailable(v === true); setPage(1); }} />
                 Available only
               </label>
               <input
