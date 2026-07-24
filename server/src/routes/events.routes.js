@@ -49,12 +49,13 @@ function validateDates(startTs, endTs) {
 
 async function replaceAirports(tx, eventId, airportList) {
   await tx.query('DELETE FROM event_airports WHERE eventId=:e', { e: eventId });
-  const icaos = [...new Set(
-    String(airportList || '')
-      .split(',')
-      .map((s) => s.trim().toUpperCase())
-      .filter((s) => /^[A-Z]{4}$/.test(s))
-  )];
+  const tokens = String(airportList || '')
+    .split(',')
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+  // Reject any non-ICAO token rather than silently dropping it.
+  if (tokens.some((t) => !/^[A-Z]{4}$/.test(t))) throw new ApiError(422, 'event.invalidAirport');
+  const icaos = [...new Set(tokens)];
   if (icaos.length === 0) throw new ApiError(422, 'event.noAirports');
   for (const icao of icaos) {
     await tx.query('INSERT INTO event_airports (eventId, icao) VALUES (:e,:i)', { e: eventId, i: icao });
@@ -76,6 +77,8 @@ router.get(
     } else {
       where.push('dateEnd >= UTC_TIMESTAMP()');
       where.push("status <> 'cancelled'");
+      // Non-public events are staff-only, even in the normal (non-admin) listing.
+      if (!req.user?.isAdmin) where.push('publicAccess = 1');
     }
 
     if (req.query.status) {
@@ -113,6 +116,8 @@ router.get(
   asyncHandler(async (req, res) => {
     const event = await queryOne('SELECT * FROM events WHERE id=:id', { id: req.params.id });
     if (!event) throw new ApiError(404, 'event.notFound');
+    // Private events are only reachable by staff.
+    if (!event.publicAccess && !req.user?.isAdmin) throw new ApiError(404, 'event.notFound');
     const decorated = await decorateEvent(event);
     if (decorated.hasEnded && !req.user?.isAdmin && event.status !== 'finished') {
       // still visible, but this mirrors original gating for ended non-admin views

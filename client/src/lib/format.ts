@@ -71,6 +71,7 @@ const MESSAGES: Record<string, string> = {
   'event.tooLong': 'Events cannot be longer than the allowed maximum.',
   'event.endBeforeStart': 'End time must be after the start time.',
   'event.noAirports': 'Please provide at least one valid ICAO airport.',
+  'event.invalidAirport': 'One of the airports is not a valid 4-letter ICAO code.',
   'slot.notFound': 'Slot not found.',
   'file.required': 'Please choose a CSV file.',
   'file.invalidCsv': 'That file could not be read as CSV.',

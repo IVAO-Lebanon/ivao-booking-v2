@@ -5,7 +5,7 @@ import { api, apiErrorMessage } from '../../api/client';
 import type { EventModel } from '../../api/types';
 import { Select, Switch } from '@ivao/atmosphere-react';
 import { Modal, Spinner, PageLoader, EmptyState, StatusBadge, Pagination } from '../../components/ui';
-import { Plus } from 'lucide-react';
+import { Plus, TriangleAlert } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 import { useConfirm } from '../../components/Confirm';
 import { friendlyError, fmtUtc } from '../../lib/format';
@@ -83,7 +83,7 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
       toast.success(editing ? 'Event updated.' : 'Event created.');
       onClose();
     },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => setError(friendlyError(apiErrorMessage(e))),
   });
 
   const set = (k: string) => (e: any) => setF((s) => ({ ...s, [k]: e.target.value }));
@@ -96,15 +96,50 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
   const setDay = (k: 'dateStart' | 'dateEnd') => (day: string) => setF((s) => ({ ...s, [k]: `${day}T${timePart(s[k]) || '00:00'}` }));
   const setTime = (k: 'dateStart' | 'dateEnd') => (tm: string) => setF((s) => ({ ...s, [k]: `${dayPart(s[k])}T${tm}` }));
 
+  // Inline validation — every field is checked against its expected shape so no
+  // stray/random values reach the server; the first problem is shown in the modal.
+  const [error, setError] = useState('');
+  const isUrl = (v: string) => {
+    try { const u = new URL(v.trim()); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; }
+  };
+  const isTime = (v: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
+  const validate = (): string => {
+    if (!f.eventName.trim()) return 'Enter an event name.';
+    if (!f.description.trim()) return 'Enter a description.';
+    const airports = f.airports.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
+    if (airports.length === 0) return 'Add at least one airport (4-letter ICAO).';
+    const badIcao = airports.find((a) => !/^[A-Z]{4}$/.test(a));
+    if (badIcao) return `"${badIcao}" is not a valid 4-letter ICAO code.`;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayPart(f.dateStart)) || !isTime(timePart(f.dateStart))) return 'Enter a valid start date and time (HH:MM, 24h UTC).';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayPart(f.dateEnd)) || !isTime(timePart(f.dateEnd))) return 'Enter a valid end date and time (HH:MM, 24h UTC).';
+    if (toUnix(f.dateEnd) <= toUnix(f.dateStart)) return 'The end time must be after the start time.';
+    if (!isUrl(f.banner)) return 'Banner must be a valid http(s) URL.';
+    if (!isUrl(f.atcBooking)) return 'ATC booking must be a valid http(s) URL.';
+    if (f.pilotBriefing.trim() && !isUrl(f.pilotBriefing)) return 'Pilot briefing must be a valid URL, or leave it blank.';
+    if (f.atcBriefing.trim() && !isUrl(f.atcBriefing)) return 'ATC briefing must be a valid URL, or leave it blank.';
+    const max = Number(f.maxBookingsPerPilot);
+    if (!Number.isInteger(max) || max < 0 || max > 999) return 'Max bookings per pilot must be a whole number from 0 to 999.';
+    return '';
+  };
+
   return (
     <Modal open onClose={onClose} title={editing ? 'Edit event' : 'Create event'} maxWidth="max-w-2xl">
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
+          const err = validate();
+          if (err) { setError(err); return; }
+          setError('');
           save.mutate();
         }}
         className="space-y-3"
       >
+        {error && (
+          <div className="flex items-start gap-2 rounded-lg border border-danger-300 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-900/50 dark:bg-danger-900/20 dark:text-danger-300">
+            <TriangleAlert size={15} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
         <div>
           <label className="label">Event name</label>
           <input className="input" value={f.eventName} onChange={set('eventName')} required />
@@ -172,16 +207,16 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
         </div>
         <div>
           <label className="label">Banner URL</label>
-          <input className="input" value={f.banner} onChange={set('banner')} placeholder="https://…" required />
+          <input type="url" className="input" value={f.banner} onChange={set('banner')} placeholder="https://…" required />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <label className="label">ATC booking URL</label>
-            <input className="input" value={f.atcBooking} onChange={set('atcBooking')} required />
+            <input type="url" className="input" value={f.atcBooking} onChange={set('atcBooking')} placeholder="https://…" required />
           </div>
           <div>
             <label className="label">Pilot briefing URL</label>
-            <input className="input" value={f.pilotBriefing} onChange={set('pilotBriefing')} />
+            <input type="url" className="input" value={f.pilotBriefing} onChange={set('pilotBriefing')} placeholder="https://… (optional)" />
           </div>
           <div>
             <label className="label">ATC briefing URL</label>
@@ -191,7 +226,7 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="label">Max bookings per pilot (0 = unlimited)</label>
-            <input type="number" min={0} className="input" value={f.maxBookingsPerPilot} onChange={set('maxBookingsPerPilot')} />
+            <input type="number" min={0} max={999} step={1} className="input" value={f.maxBookingsPerPilot} onChange={set('maxBookingsPerPilot')} />
           </div>
         </div>
         <div>
