@@ -1,0 +1,182 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+@layer base {
+  body {
+    @apply bg-fuselage-100 font-sans text-fuselage-800 antialiased dark:bg-fuselage-950 dark:text-fuselage-100;
+    font-feature-settings: 'cv05' 1, 'ss01' 1;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-head tracking-tight;
+  }
+  ::selection {
+    @apply bg-atmos-500/25;
+  }
+  /* Tabular figures for all monospace data so columns of times/codes align. */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* ---- Buttons ---------------------------------------------------------- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-atmos-500
+      disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-fuselage-950;
+  }
+  .btn-primary {
+    @apply btn bg-atmos-700 text-white shadow-sm shadow-atmos-900/30 hover:bg-atmos-600
+      active:bg-atmos-800 active:shadow-none;
+  }
+  .btn-secondary {
+    @apply btn border border-fuselage-200 bg-white text-fuselage-700 shadow-sm hover:border-fuselage-300 hover:bg-fuselage-50
+      dark:border-fuselage-700 dark:bg-fuselage-800 dark:text-fuselage-100 dark:hover:bg-fuselage-700;
+  }
+  .btn-danger {
+    @apply btn bg-danger-600 text-white shadow-sm shadow-danger-900/30 hover:bg-danger-500 active:bg-danger-700;
+  }
+  .btn-ghost {
+    @apply btn text-fuselage-600 hover:bg-fuselage-200/70 dark:text-fuselage-300 dark:hover:bg-fuselage-800;
+  }
+
+  /* ---- Form controls ---------------------------------------------------- */
+  .input {
+    @apply w-full rounded-lg border border-fuselage-200 bg-white px-3 py-2 text-sm text-fuselage-800 shadow-sm
+      placeholder:text-fuselage-400 focus:border-atmos-500 focus:outline-none focus:ring-2 focus:ring-atmos-500/30
+      dark:border-fuselage-700 dark:bg-fuselage-900 dark:text-fuselage-100;
+  }
+  .label {
+    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-fuselage-500 dark:text-fuselage-400;
+  }
+  /* Eyebrow: mono, wide-tracked section kicker — reads like a data field label. */
+  .eyebrow {
+    @apply font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-atmos-600 dark:text-atmos-400;
+  }
+
+  /* ---- Surfaces --------------------------------------------------------- */
+  .card {
+    @apply rounded-2xl border border-fuselage-150 bg-white shadow-sm shadow-fuselage-900/5
+      dark:border-fuselage-800 dark:bg-fuselage-900;
+  }
+  .card-hover {
+    @apply transition duration-200 hover:-translate-y-0.5 hover:border-atmos-200 hover:shadow-lg hover:shadow-atmos-900/10
+      dark:hover:border-atmos-800/60;
+  }
+  .panel {
+    @apply rounded-xl border border-fuselage-150 bg-fuselage-50 dark:border-fuselage-800 dark:bg-fuselage-900/60;
+  }
+
+  /* ---- Badges ----------------------------------------------------------- */
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .badge-dot::before {
+    content: '';
+    @apply h-1.5 w-1.5 rounded-full bg-current opacity-80;
+  }
+
+  /* ---- Split-flap board cell (the signature element) -------------------- */
+  .flap {
+    @apply inline-grid place-items-center rounded-[3px] bg-fuselage-950 px-1 font-mono font-semibold
+      leading-none text-atmos-50 shadow-inner ring-1 ring-inset ring-white/10;
+    /* thin horizontal seam through the middle, like a real split-flap tile */
+    background-image: linear-gradient(to bottom, transparent calc(50% - 0.5px), rgba(0, 0, 0, 0.45) 50%, transparent calc(50% + 0.5px));
+  }
+
+  /* ---- Flight strip (slot row) ------------------------------------------ */
+  .strip {
+    @apply relative grid overflow-hidden rounded-xl border border-fuselage-150 bg-white pl-3 transition
+      hover:border-fuselage-250 hover:shadow-md dark:border-fuselage-800 dark:bg-fuselage-900 dark:hover:border-fuselage-700;
+  }
+  /* Colored status rail down the left edge. */
+  .strip::before {
+    content: '';
+    @apply absolute inset-y-0 left-0 w-1.5;
+    background: var(--rail, theme('colors.fuselage.300'));
+  }
+}
+
+@layer utilities {
+  /* Faint instrument-panel grid for hero / board backgrounds. */
+  .terminal-grid {
+    background-image:
+      linear-gradient(rgba(19, 66, 228, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(19, 66, 228, 0.07) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .hairline {
+    @apply border-fuselage-150 dark:border-fuselage-800;
+  }
+}
+
+/* Route-map polish: styled ICAO labels + a flowing dashed route line. */
+.leaflet-tooltip.rm-tip {
+  background: rgba(11, 16, 32, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e8ecff;
+  font: 700 11px/1 'IBM Plex Mono', ui-monospace, monospace;
+  letter-spacing: 1.5px;
+  padding: 4px 8px 4px 7px;
+  border-radius: 7px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+.leaflet-tooltip.rm-tip::before {
+  display: none !important;
+  border: none !important;
+}
+.leaflet-tooltip.rm-dep {
+  border-left: 3px solid #2ec662;
+}
+.leaflet-tooltip.rm-arr {
+  border-left: 3px solid #335cee;
+}
+.rm-flow {
+  animation: rmflow 1s linear infinite;
+}
+@keyframes rmflow {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Thin scrollbars for slot tables */
+.scroll-thin::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  @apply rounded-full bg-fuselage-300 dark:bg-fuselage-700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# Secrets and local env (keep .env.example tracked)
+.env
+.env.local
+server/.env
+client/.env
+
+# Build artifacts
+*.tsbuildinfo
