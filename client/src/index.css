@@ -124,6 +124,17 @@ body,
   }
 }
 
+/* Atmosphere dark-theme overrides: its dark `--primary` is near-white, which makes
+   Switch/Checkbox "on" states and primary buttons render white in dark mode, and
+   `--input` (the Switch "off" track) matches the surface so toggles vanish. Keep
+   Atmosphere components on our brand blue with visible off-tracks in dark mode. */
+.dark {
+  --primary: var(--atmos-500);
+  --primary-foreground: var(--fuselage-50);
+  --input: var(--fuselage-700);
+  --ring: var(--atmos-500);
+}
+
 /* Route-map polish: styled ICAO labels + a flowing dashed route line. */
 .leaflet-tooltip.rm-tip {
   background: rgba(11, 16, 32, 0.9);
