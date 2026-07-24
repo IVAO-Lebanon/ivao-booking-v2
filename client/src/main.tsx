@@ -7,6 +7,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { ThemeProvider } from './lib/theme';
 import { ToastProvider } from './components/Toast';
 import { ConfirmProvider } from './components/Confirm';
+import '@ivao/atmosphere-react/dist/styles/index.css';
 import './index.css';
 
 const queryClient = new QueryClient({

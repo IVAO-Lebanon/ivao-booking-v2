@@ -1,9 +1,11 @@
+import { lazy, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plane, MapPin, CloudSun, Mountain, Route as RouteIcon } from 'lucide-react';
 import { api } from '../api/client';
 import type { AirportBrief, EventModel, Slot } from '../api/types';
 import { Modal, Spinner, StatusBadge } from './ui';
-import { RouteMapLeaflet } from './RouteMapLeaflet';
+// Leaflet is heavy (~150 kB) and only needed once a flight is opened — load it on demand.
+const RouteMapLeaflet = lazy(() => import('./RouteMapLeaflet').then((m) => ({ default: m.RouteMapLeaflet })));
 import { AirlineLogo } from './AirlineLogo';
 import { textureImageUrl, airlineCode } from '../lib/branding';
 import { fmtDateUtc, fmtTimeUtc } from '../lib/format';
@@ -142,11 +144,13 @@ export function FlightDetailModal({ slot, event, onClose }: { slot: Slot; event?
         {/* Interactive map (only when we have both airports' coordinates) */}
         {hasCoords(dep) && hasCoords(arr) ? (
           <div className="relative">
-            <RouteMapLeaflet
-              dep={{ lat: dep.latitude, lon: dep.longitude, icao: dep.icao }}
-              arr={{ lat: arr.latitude, lon: arr.longitude, icao: arr.icao }}
-              liveryUrl={liveryUrl || undefined}
-            />
+            <Suspense fallback={<div className="grid h-72 w-full place-items-center rounded-xl border border-fuselage-150 bg-fuselage-950 dark:border-fuselage-800"><Spinner className="h-6 w-6 text-atmos-400" /></div>}>
+              <RouteMapLeaflet
+                dep={{ lat: dep.latitude, lon: dep.longitude, icao: dep.icao }}
+                arr={{ lat: arr.latitude, lon: arr.longitude, icao: arr.icao }}
+                liveryUrl={liveryUrl || undefined}
+              />
+            </Suspense>
             {/* Livery name caption (the plane itself flies the route, rendered inside the map). */}
             {liveryUrl && liveryQ.data?.name && (
               <span className="pointer-events-none absolute bottom-2 left-3 z-[500] max-w-[70%] truncate rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white backdrop-blur">

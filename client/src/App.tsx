@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { divisionLogoUrl } from './lib/branding';
+import { PageLoader } from './components/ui';
 import Layout from './components/Layout';
 import EventsPage from './pages/EventsPage';
 import EventDetailPage from './pages/EventDetailPage';
@@ -9,15 +10,18 @@ import MyBookingsPage from './pages/MyBookingsPage';
 import LoginPage from './pages/LoginPage';
 import LoginCallbackPage from './pages/LoginCallbackPage';
 import NotFoundPage from './pages/NotFoundPage';
-import AdminLayout from './pages/admin/AdminLayout';
-import DashboardPage from './pages/admin/DashboardPage';
-import EventsAdminPage from './pages/admin/EventsAdminPage';
-import AdminSlotsPage from './pages/admin/AdminSlotsPage';
-import EventTypesPage from './pages/admin/EventTypesPage';
-import SceneriesPage from './pages/admin/SceneriesPage';
-import SimulatorsPage from './pages/admin/SimulatorsPage';
-import AircraftPage from './pages/admin/AircraftPage';
-import UsersPage from './pages/admin/UsersPage';
+
+// Code-split the admin section so it leaves the initial bundle (offsets the
+// weight Atmosphere + Radix add to the shared vendor chunk).
+const AdminLayout = lazy(() => import('./pages/admin/AdminLayout'));
+const DashboardPage = lazy(() => import('./pages/admin/DashboardPage'));
+const EventsAdminPage = lazy(() => import('./pages/admin/EventsAdminPage'));
+const AdminSlotsPage = lazy(() => import('./pages/admin/AdminSlotsPage'));
+const EventTypesPage = lazy(() => import('./pages/admin/EventTypesPage'));
+const SceneriesPage = lazy(() => import('./pages/admin/SceneriesPage'));
+const SimulatorsPage = lazy(() => import('./pages/admin/SimulatorsPage'));
+const AircraftPage = lazy(() => import('./pages/admin/AircraftPage'));
+const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
 
 /** Sets the browser favicon to the configured division's IVAO logo. */
 function DivisionFavicon() {
@@ -41,6 +45,7 @@ export default function App() {
   return (
     <>
       <DivisionFavicon />
+      <Suspense fallback={<PageLoader />}>
       <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/login/callback" element={<LoginCallbackPage />} />
@@ -61,6 +66,7 @@ export default function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Route>
       </Routes>
+      </Suspense>
     </>
   );
 }
