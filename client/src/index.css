@@ -135,6 +135,14 @@ body,
   --ring: var(--atmos-500);
 }
 
+/* Atmosphere Select fix: in popper mode its viewport is forced to the trigger
+   height (h-[var(--radix-select-trigger-height)]), which clamps the dropdown to
+   a single visible option. Let it grow to fit the options and scroll past ~16rem. */
+[data-radix-select-viewport] {
+  height: auto !important;
+  max-height: 16rem;
+}
+
 /* Route-map polish: styled ICAO labels + a flowing dashed route line. */
 .leaflet-tooltip.rm-tip {
   background: rgba(11, 16, 32, 0.9);

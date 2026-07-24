@@ -111,6 +111,7 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
           <div>
             <label className="label">Type</label>
             <Select
+              position="popper"
               value={f.type}
               onValueChange={setVal('type')}
               placeholder="Select type"
@@ -120,6 +121,7 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
           <div>
             <label className="label">Status</label>
             <Select
+              position="popper"
               value={f.status}
               onValueChange={setVal('status')}
               placeholder="Select status"

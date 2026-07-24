@@ -39,6 +39,7 @@ function SceneryForm({ editing, onClose }: { editing: Scenery | null; onClose: (
           <div>
             <label className="label">Simulator</label>
             <Select
+              position="popper"
               value={f.simulator}
               onValueChange={setVal('simulator')}
               placeholder="Select simulator"
@@ -53,6 +54,7 @@ function SceneryForm({ editing, onClose }: { editing: Scenery | null; onClose: (
         <div>
           <label className="label">License</label>
           <Select
+            position="popper"
             value={f.license}
             onValueChange={setVal('license')}
             placeholder="Select license"
