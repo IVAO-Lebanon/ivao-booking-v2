@@ -3,7 +3,6 @@ import { Plus, Upload, Download, TriangleAlert, CircleCheck, Plane, FileSpreadsh
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import type { EventModel, Slot } from '../api/types';
-import { Switch } from '@ivao/atmosphere-react';
 import { Modal, Spinner } from './ui';
 import { useToast } from './Toast';
 import { friendlyError, fmtUtc } from '../lib/format';
@@ -11,7 +10,7 @@ import { friendlyError, fmtUtc } from '../lib/format';
 function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () => void }) {
   const toast = useToast();
   const qc = useQueryClient();
-  const [f, setF] = useState({ flightNumber: '', origin: '', destination: '', aircraft: '', gate: '', slotTime: '', isPrivate: false });
+  const [f, setF] = useState({ flightNumber: '', origin: '', destination: '', aircraft: '', gate: '', slotTime: '' });
 
   const create = useMutation({
     mutationFn: () =>
@@ -22,7 +21,6 @@ function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () =>
         aircraft: f.aircraft || null,
         gate: f.gate || null,
         slotTime: f.slotTime ? f.slotTime.replace('T', ' ') + ':00' : null,
-        isPrivate: f.isPrivate,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['slots', event.id] });
@@ -45,7 +43,8 @@ function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () =>
         className="space-y-3"
       >
         <p className="rounded-lg bg-fuselage-100 px-3 py-2 text-xs text-fuselage-500 dark:bg-fuselage-800">
-          Fill a field to <b>fix</b> it; leave it empty to let pilots choose it when booking.
+          Fill a field to <b>fix</b> it; leave it empty to let pilots choose it when booking. A slot with an open
+          origin and/or destination is a <b>Private</b> slot; a fully-set route is a Departure or Arrival.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -78,10 +77,6 @@ function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () =>
             />
           </div>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <Switch checked={f.isPrivate} onCheckedChange={(v) => setF((s) => ({ ...s, isPrivate: v }))} />
-          Private slot
-        </label>
         <div className="flex gap-2 pt-2">
           <button type="button" className="btn-secondary flex-1" onClick={onClose}>
             Cancel
@@ -145,7 +140,6 @@ const CSV_COLUMNS: { name: string; desc: string }[] = [
   { name: 'aircraft', desc: 'Aircraft ICAO type, e.g. A320.' },
   { name: 'gate', desc: 'Gate / parking stand, e.g. B4.' },
   { name: 'slotTime', desc: 'Slot time in UTC, format "YYYY-MM-DD HH:MM:SS".' },
-  { name: 'isPrivate', desc: '0 or 1 (1 marks a private slot).' },
 ];
 
 function ImportCsvModal({
@@ -170,7 +164,8 @@ function ImportCsvModal({
         <div className="rounded-lg border border-atmos-100 bg-atmos-50 px-3 py-2 text-atmos-800 dark:border-atmos-900/50 dark:bg-atmos-900/20 dark:text-atmos-200">
           <span className="font-semibold">How fields work:</span> leave a cell <b>empty</b> to let the pilot choose
           that value when booking. <b>Fill</b> a cell to fix it. Fixed values are staff-set and pilots can’t change
-          them (shown to pilots with a <span className="font-bold text-danger-500">*</span>).
+          them (shown to pilots with a <span className="font-bold text-danger-500">*</span>). A row with an open
+          origin and/or destination becomes a <b>Private</b> slot; a full route is a Departure or Arrival.
         </div>
 
         <div className="panel p-3">
@@ -192,12 +187,13 @@ function ImportCsvModal({
         <div>
           <div className="eyebrow mb-1">Example</div>
           <pre className="overflow-x-auto scroll-thin rounded-lg bg-fuselage-950 px-3 py-2 font-mono text-[11px] text-atmos-100">
-{`flightNumber,origin,destination,aircraft,gate,slotTime,isPrivate
-ABC123,EGLL,LFPG,A320,B4,2026-08-01 16:00:00,0
-,EGLL,,A320,,,0`}
+{`flightNumber,origin,destination,aircraft,gate,slotTime
+BAW201,EGLL,LFPG,A320,B4,2026-08-01 16:00:00
+,EGLL,,A320,,2026-08-01 16:30:00`}
           </pre>
           <p className="mt-1 text-xs text-fuselage-400">
-            Row 2 fixes everything; row 3 fixes only the origin and aircraft, so the pilot fills the rest.
+            Row 2 is a full route (a Departure/Arrival). Row 3 leaves the destination open, so it's a Private slot
+            the pilot completes.
           </p>
         </div>
 

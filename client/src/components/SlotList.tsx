@@ -1,9 +1,9 @@
 import { CSSProperties, FormEvent, useState } from 'react';
-import { Plane, Trash2, Pencil, Lock, LockOpen, Clock, X } from 'lucide-react';
+import { Plane, Trash2, Pencil, Clock, X } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import type { EventModel, Slot } from '../api/types';
-import { Switch, Checkbox } from '@ivao/atmosphere-react';
+import { Checkbox } from '@ivao/atmosphere-react';
 import { StatusBadge, statusRail, Modal, Spinner } from './ui';
 import { FlightDetailModal } from './FlightDetailModal';
 import { liveStatus, LiveFlightChip } from './LiveEventBoard';
@@ -41,7 +41,6 @@ function EditSlotModal({ event, slot, onClose }: { event: EventModel; slot: Slot
     aircraft: slot.aircraft || '',
     gate: slot.gate || '',
     slotTime: toLocalInput(slot.slotTime),
-    isPrivate: slot.isPrivate,
   });
 
   const save = useMutation({
@@ -53,7 +52,6 @@ function EditSlotModal({ event, slot, onClose }: { event: EventModel; slot: Slot
         aircraft: f.aircraft || null,
         gate: f.gate || null,
         slotTime: f.slotTime || null,
-        isPrivate: f.isPrivate,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['slots', event.id] });
@@ -99,10 +97,6 @@ function EditSlotModal({ event, slot, onClose }: { event: EventModel; slot: Slot
             <input type="datetime-local" className="input" value={f.slotTime} onChange={(e) => setF((s) => ({ ...s, slotTime: e.target.value }))} />
           </div>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <Switch checked={f.isPrivate} onCheckedChange={(v) => setF((s) => ({ ...s, isPrivate: v }))} />
-          Private slot
-        </label>
         <div className="flex gap-2 pt-2">
           <button type="button" className="btn-secondary flex-1" onClick={onClose}>Cancel</button>
           <button className="btn-primary flex-1" disabled={save.isPending}>{save.isPending ? <Spinner /> : 'Save changes'}</button>
@@ -260,12 +254,6 @@ export function SlotList({
           <span className="font-mono text-xs font-bold uppercase tracking-wider text-atmos-700 dark:text-atmos-300">
             {selected.size} selected
           </span>
-          <button className="btn-secondary px-2.5 py-1 text-xs" onClick={() => runBulk('setPrivate')} disabled={busy}>
-            <Lock size={13} /> Private
-          </button>
-          <button className="btn-secondary px-2.5 py-1 text-xs" onClick={() => runBulk('setPublic')} disabled={busy}>
-            <LockOpen size={13} /> Public
-          </button>
           <button className="btn-secondary px-2.5 py-1 text-xs" onClick={() => runBulk('free')} disabled={busy}>
             Free up
           </button>

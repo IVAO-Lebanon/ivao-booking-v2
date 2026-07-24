@@ -154,8 +154,11 @@ router.get(
   requireAdmin,
   asyncHandler(async (_req, res) => {
     const csv = toCsv(
-      ['flightNumber', 'origin', 'destination', 'aircraft', 'gate', 'slotTime', 'isPrivate'],
-      [{ flightNumber: 'ME201', origin: 'OLBA', destination: 'OJAI', aircraft: 'A320', gate: 'B4', slotTime: '2026-08-01 16:00:00', isPrivate: 0 }]
+      ['flightNumber', 'origin', 'destination', 'aircraft', 'gate', 'slotTime'],
+      [
+        { flightNumber: 'BAW201', origin: 'EGLL', destination: 'LFPG', aircraft: 'A320', gate: 'B4', slotTime: '2026-08-01 16:00:00' },
+        { flightNumber: '', origin: 'EGLL', destination: '', aircraft: '', gate: '', slotTime: '2026-08-01 16:30:00' },
+      ]
     );
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="slot_template.csv"');
@@ -211,7 +214,8 @@ router.post(
       slotTime: data.slotTime ? data.slotTime.replace('T', ' ').slice(0, 19) : null,
       isFixedSlotTime: data.slotTime ? 1 : 0,
       gate: data.gate ?? null,
-      isPrivate: data.isPrivate ? 1 : 0,
+      // Private = the route isn't fully specified (origin and/or destination left open).
+      isPrivate: data.origin && data.destination ? 0 : 1,
       route: data.route ?? null,
     };
     const result = await query(
@@ -264,7 +268,7 @@ router.post(
         slotTime: d.slotTime ? d.slotTime.replace('T', ' ').slice(0, 19) : null,
         isFixedSlotTime: d.slotTime ? 1 : 0,
         gate: d.gate ?? null,
-        isPrivate: d.isPrivate ? 1 : 0,
+        isPrivate: d.origin && d.destination ? 0 : 1,
       });
     }
 
@@ -314,7 +318,8 @@ router.put(
         slotTime: data.slotTime ? data.slotTime.replace('T', ' ').slice(0, 19) : null,
         isFixedSlotTime: data.slotTime ? 1 : 0,
         gate: data.gate ?? null,
-        isPrivate: data.isPrivate ? 1 : 0,
+        // Private = the route isn't fully specified (origin and/or destination left open).
+      isPrivate: data.origin && data.destination ? 0 : 1,
         route: data.route ?? null,
       }
     );
@@ -369,12 +374,6 @@ router.post(
              route        = NULL
            WHERE eventId=:e AND id IN (${placeholders})`,
           params
-        );
-        affected = r.affectedRows;
-      } else if (action === 'setPrivate' || action === 'setPublic') {
-        const r = await tx.query(
-          `UPDATE slots SET isPrivate=:v WHERE eventId=:e AND id IN (${placeholders})`,
-          { ...params, v: action === 'setPrivate' ? 1 : 0 }
         );
         affected = r.affectedRows;
       } else if (action === 'shift') {

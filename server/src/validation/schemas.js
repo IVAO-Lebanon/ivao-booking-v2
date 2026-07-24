@@ -99,13 +99,12 @@ export const slotSchema = z.object({
     .optional()
     .nullable(),
   slotTime: dateTime,
-  isPrivate: boolFlag.optional(),
   route: z.string().max(2000).optional().nullable(),
 });
 
 // Admin bulk slot operations. `ids` are validated to belong to the event in the route.
 export const bulkSlotSchema = z.object({
-  action: z.enum(['delete', 'free', 'setPrivate', 'setPublic', 'shift']),
+  action: z.enum(['delete', 'free', 'shift']),
   ids: z.array(z.coerce.number().int().positive()).min(1).max(2000),
   minutes: z.coerce.number().int().min(-1440).max(1440).optional(),
 });
