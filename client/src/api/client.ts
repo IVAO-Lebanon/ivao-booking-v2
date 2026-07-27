@@ -8,6 +8,7 @@ import type {
   EmailResult,
   EmailStatus,
   EmailRecipient,
+  EmailApproval,
   EventLive,
   IvaoImport,
   EventModel,
@@ -201,6 +202,13 @@ class ApiClient {
     this.axios.post<EmailResult & { to: string }>(`/event/${eventId}/email/test`, body).then((r) => r.data);
   emailRecipients = (eventId: number, emailId: number) =>
     this.axios.get<EmailRecipient[]>(`/event/${eventId}/email/${emailId}/recipients`).then((r) => r.data);
+
+  // ── Email approval queue (system emails awaiting an admin click) ──
+  emailApprovals = (eventId?: number) =>
+    this.axios.get<EmailApproval[]>('/email-approval', { params: eventId ? { eventId } : {} }).then((r) => r.data);
+  approveEmail = (id: number) =>
+    this.axios.post<{ sent: number; total: number; failed: number }>(`/email-approval/${id}/approve`).then((r) => r.data);
+  dismissEmail = (id: number) => this.axios.post(`/email-approval/${id}/dismiss`).then(() => {});
 
   // ── Custom data (airports / aircraft) ──
   customAirports = () => this.axios.get<CustomAirport[]>('/custom/airport').then((r) => r.data);

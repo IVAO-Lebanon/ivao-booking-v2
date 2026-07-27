@@ -13,6 +13,7 @@ import {
   eventCtx,
   participantCtx,
   loadParticipants,
+  loadUnconfirmed,
   composeFor,
 } from '../services/eventEmails.js';
 
@@ -22,21 +23,6 @@ async function getEventOr404(id) {
   const e = await queryOne('SELECT * FROM events WHERE id=:id', { id });
   if (!e) throw new ApiError(404, 'event.notFound');
   return e;
-}
-
-// Pilots who booked but have NOT confirmed yet (the confirm-reminder audience).
-async function loadUnconfirmed(eventId) {
-  const rows = await query(
-    `SELECT u.id, u.vid, u.firstName, u.lastName, u.email,
-            s.flightNumber, s.origin, s.destination, s.slotTime, s.aircraft, s.gate
-       FROM slots s JOIN users u ON u.id = s.pilotId
-      WHERE s.eventId = :e AND s.bookingStatus = 'prebooked' AND u.email IS NOT NULL AND u.email <> ''
-      ORDER BY s.slotTime ASC`,
-    { e: eventId }
-  );
-  const byPilot = new Map();
-  for (const r of rows) if (!byPilot.has(r.id)) byPilot.set(r.id, r);
-  return [...byPilot.values()];
 }
 
 // Pilots whose booking is CONFIRMED (booked) with an email.
@@ -312,6 +298,82 @@ router.get(
       { id: req.params.emailId, e: event.id }
     );
     res.json(rows.map((r) => ({ ...r, ok: Boolean(r.ok) })));
+  })
+);
+
+// ── Email approval queue ─────────────────────────────────────────────────────
+// Emails the SYSTEM wants to send (scheduled confirm reminders, cancellation
+// notices) are queued as pending approvals. NOTHING is emailed until an admin
+// approves an item here, so no email ever leaves without an explicit click.
+
+const APPROVAL_SUBJECT = {
+  'confirm-reminder': (e) => `Confirm reminder: ${e.eventName}`,
+  cancelled: (e) => `Cancelled: ${e.eventName}`,
+};
+
+// Pending approvals (optionally for one event), newest event context joined in.
+router.get(
+  '/email-approval',
+  ...adminOnly,
+  asyncHandler(async (req, res) => {
+    const eventId = req.query.eventId ? Number(req.query.eventId) : null;
+    const rows = await query(
+      `SELECT a.id, a.eventId, a.type, a.audienceCount, a.createdAt, e.eventName, e.dateStart
+         FROM email_approvals a JOIN events e ON e.id = a.eventId
+        WHERE a.status = 'pending' ${eventId ? 'AND a.eventId = :eventId' : ''}
+        ORDER BY a.createdAt ASC`,
+      eventId ? { eventId } : {}
+    );
+    res.json(rows);
+  })
+);
+
+// Approve a pending email: send it now (to the current audience) and log it.
+router.post(
+  '/email-approval/:id/approve',
+  ...adminOnly,
+  asyncHandler(async (req, res) => {
+    const ap = await queryOne("SELECT * FROM email_approvals WHERE id=:id AND status='pending'", { id: req.params.id });
+    if (!ap) throw new ApiError(404, 'approval.notFound');
+    const event = await getEventOr404(ap.eventId);
+
+    const isCancel = ap.type === 'cancelled';
+    const recipients = isCancel ? await loadParticipants(event.id) : await loadUnconfirmed(event.id);
+    const defaults = isCancel ? composerDefaults.cancelled : composerDefaults.confirmReminder;
+    const composerType = isCancel ? 'cancelled' : 'confirmReminder';
+
+    const messages = recipients.map((p) => {
+      const { subject, html, text } = composeFor(composerType, defaults, participantCtx(event, p), event);
+      return { to: p.email, subject, html, text };
+    });
+    const result = await sendBulk(messages);
+
+    if (result.total > 0) {
+      const emailId = await recordSend(event.id, ap.type, APPROVAL_SUBJECT[ap.type](event), req.user.id, result);
+      await recordRecipients(emailId, recipients, result);
+    }
+    await query("UPDATE email_approvals SET status='sent', decidedAt=UTC_TIMESTAMP(), decidedBy=:by WHERE id=:id", {
+      by: req.user.id,
+      id: ap.id,
+    });
+    await audit(req.user.id, `approve:${ap.type}`, 'event', event.id, { sent: result.sent, failed: result.failed });
+    res.json(result);
+  })
+);
+
+// Dismiss a pending email without sending it.
+router.post(
+  '/email-approval/:id/dismiss',
+  ...adminOnly,
+  asyncHandler(async (req, res) => {
+    const ap = await queryOne("SELECT id, eventId, type FROM email_approvals WHERE id=:id AND status='pending'", { id: req.params.id });
+    if (!ap) throw new ApiError(404, 'approval.notFound');
+    await query("UPDATE email_approvals SET status='dismissed', decidedAt=UTC_TIMESTAMP(), decidedBy=:by WHERE id=:id", {
+      by: req.user.id,
+      id: ap.id,
+    });
+    await audit(req.user.id, `dismiss:${ap.type}`, 'event', ap.eventId, null);
+    res.json({ ok: true });
   })
 );
 

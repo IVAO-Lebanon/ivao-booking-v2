@@ -88,8 +88,19 @@ export interface ReconcileSummary {
 export interface EventUpdateApplied {
   confirmedPending: number;
   slotsShifted: number;
-  cancelEmails: number;
+  cancelQueued: number;
   overLimit: number;
+}
+
+/** A system email waiting for admin approval before it can be sent. */
+export interface EmailApproval {
+  id: number;
+  eventId: number;
+  eventName: string;
+  dateStart: string;
+  type: 'confirm-reminder' | 'cancelled';
+  audienceCount: number;
+  createdAt: string;
 }
 
 export interface IvaoEventRoute {

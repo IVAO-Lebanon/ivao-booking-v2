@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import type { EmailFields, EmailStatus, EmailLogEntry, EventModel } from '../api/types';
 import { Modal, Spinner } from './ui';
+import { EmailApprovals } from './EmailApprovals';
 import { useToast } from './Toast';
 import { friendlyError, describeError, fmtUtc } from '../lib/format';
 
@@ -265,6 +266,7 @@ function LogRow({ eventId, entry }: { eventId: number; entry: EmailLogEntry }) {
 
 export function EmailPanel({ event }: { event: EventModel }) {
   const { data: status, isLoading } = useQuery({ queryKey: ['email-status', event.id], queryFn: () => api.emailStatus(event.id) });
+  const { data: approvals } = useQuery({ queryKey: ['email-approvals', event.id], queryFn: () => api.emailApprovals(event.id) });
   const [mode, setMode] = useState<Mode | null>(null);
 
   if (isLoading || !status) return null;
@@ -277,6 +279,11 @@ export function EmailPanel({ event }: { event: EventModel }) {
 
   return (
     <div className="card mb-4 p-3">
+      {approvals && approvals.length > 0 && (
+        <div className="mb-3">
+          <EmailApprovals items={approvals} />
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-1 inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-fuselage-400">
           <Mail size={13} /> Email

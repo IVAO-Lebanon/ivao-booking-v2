@@ -8,9 +8,7 @@ import { parsePagination, paginated } from '../utils/pagination.js';
 import { withEventState } from '../utils/eventState.js';
 import { audit } from '../utils/audit.js';
 import { getDivisionEvents, hasApiKey } from '../ivao/dataApi.js';
-import { sendBulk } from '../services/mailer.js';
-import { composerDefaults } from '../services/emailTemplates.js';
-import { loadParticipants, participantCtx, composeFor } from '../services/eventEmails.js';
+import { loadParticipants } from '../services/eventEmails.js';
 
 const router = Router();
 
@@ -134,31 +132,22 @@ async function computeSideEffects(existing, data, deltaMinutes) {
   return summary;
 }
 
-// Sends the cancellation notice to every participant with an email, and logs it
-// once in event_emails (type 'cancelled') for the audit + email history.
-async function sendCancellationEmails(event, userId) {
-  const recipients = await loadParticipants(event.id);
-  if (!recipients.length) return { total: 0, sent: 0, failed: 0 };
-  const opts = composerDefaults.cancelled;
-  const messages = recipients.map((p) => {
-    const { subject, html, text } = composeFor('cancelled', opts, participantCtx(event, p), event);
-    return { to: p.email, subject, html, text };
-  });
-  const result = await sendBulk(messages);
-  await query(
-    `INSERT INTO event_emails (eventId, type, onceKey, subject, sentBy, recipients, sent, failed)
-     VALUES (:e,'cancelled',:k,:s,:by,:r,:sent,:f)`,
-    {
-      e: event.id,
-      k: `cancelled-${Date.now()}-${Math.floor(Math.random() * 1e6)}`.slice(0, 40),
-      s: `Cancelled: ${event.eventName}`.slice(0, 250),
-      by: userId,
-      r: result.total,
-      sent: result.sent,
-      f: result.failed,
-    }
+// Queues a cancellation notice for admin approval (no email is sent here). Deduped:
+// skips if a pending one already exists. Returns how many pilots it will reach.
+async function queueCancellationApproval(eventId) {
+  const recipients = await loadParticipants(eventId);
+  if (!recipients.length) return 0;
+  const pending = await queryOne(
+    "SELECT id FROM email_approvals WHERE eventId=:e AND type='cancelled' AND status='pending'",
+    { e: eventId }
   );
-  return result;
+  if (!pending) {
+    await query(
+      "INSERT INTO email_approvals (eventId, type, audienceCount, status) VALUES (:e, 'cancelled', :n, 'pending')",
+      { e: eventId, n: recipients.length }
+    );
+  }
+  return recipients.length;
 }
 
 // List events. Public sees upcoming + scheduled; admins can pass showAll=true.
@@ -386,16 +375,16 @@ router.put(
     await audit(req.user.id, 'update', 'event', existing.id);
     const updated = await queryOne('SELECT * FROM events WHERE id=:id', { id: existing.id });
 
-    // Cancellation emails go out AFTER commit (outside the tx) so a slow SMTP send
-    // never holds the row lock and a mail failure doesn't roll back the status.
-    let cancelEmails = 0;
+    // Cancelling does NOT email anyone directly: no email leaves the system without
+    // an admin approving it. Instead we queue a pending cancellation notice (deduped)
+    // that an admin approves from the Dashboard or the event's Email page.
+    let cancelQueued = 0;
     if (data.status === 'cancelled' && existing.status !== 'cancelled') {
-      const r = await sendCancellationEmails(updated, req.user.id).catch(() => ({ sent: 0 }));
-      cancelEmails = r.sent || 0;
+      cancelQueued = await queueCancellationApproval(updated.id);
     }
 
     const decorated = await decorateEvent(updated);
-    res.json({ ...decorated, applied: { ...applied, cancelEmails, overLimit: effects.overLimit } });
+    res.json({ ...decorated, applied: { ...applied, cancelQueued, overLimit: effects.overLimit } });
   })
 );
 

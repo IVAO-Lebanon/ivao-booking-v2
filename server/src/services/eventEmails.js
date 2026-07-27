@@ -75,6 +75,21 @@ export async function loadParticipants(eventId) {
   return [...byPilot.values()];
 }
 
+/** Pilots who booked but have NOT confirmed yet (prebooked), deduped by pilot. */
+export async function loadUnconfirmed(eventId) {
+  const rows = await query(
+    `SELECT u.id, u.vid, u.firstName, u.lastName, u.email,
+            s.flightNumber, s.origin, s.destination, s.slotTime, s.aircraft, s.gate
+       FROM slots s JOIN users u ON u.id = s.pilotId
+      WHERE s.eventId = :e AND s.bookingStatus = 'prebooked' AND u.email IS NOT NULL AND u.email <> ''
+      ORDER BY s.slotTime ASC`,
+    { e: eventId }
+  );
+  const byPilot = new Map();
+  for (const r of rows) if (!byPilot.has(r.id)) byPilot.set(r.id, r);
+  return [...byPilot.values()];
+}
+
 // Compose one email from the fully-editable composer fields, resolving placeholders against ctx.
 export function composeFor(type, opts, ctx, event, bookings = []) {
   const subject = render(String(opts.subject || '').slice(0, 250), ctx);

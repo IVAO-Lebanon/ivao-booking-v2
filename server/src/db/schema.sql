@@ -201,6 +201,22 @@ CREATE TABLE IF NOT EXISTS event_email_recipients (
   CONSTRAINT fk_eer_email FOREIGN KEY (emailId) REFERENCES event_emails(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Emails the SYSTEM wants to send (scheduled confirm reminders, cancellation
+-- notices) are queued here for an admin to approve. Nothing is emailed until an
+-- admin approves an item; this enforces "no email sent without an admin click".
+CREATE TABLE IF NOT EXISTS email_approvals (
+  id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  eventId       BIGINT UNSIGNED NOT NULL,
+  type          ENUM('confirm-reminder','cancelled') NOT NULL,
+  audienceCount INT NOT NULL DEFAULT 0,
+  status        ENUM('pending','sent','dismissed') NOT NULL DEFAULT 'pending',
+  createdAt     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  decidedAt     DATETIME NULL,
+  decidedBy     BIGINT UNSIGNED NULL,
+  KEY idx_email_approvals (eventId, type, status),
+  CONSTRAINT fk_email_approvals_event FOREIGN KEY (eventId) REFERENCES events(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Staff-defined custom airports. These supplement the IVAO catalogue and, when an
 -- ICAO matches, OVERRIDE it in the typeaheads and flight map (e.g. an event-only or
 -- fictional field). Coordinates feed the route map; weather still comes from IVAO.

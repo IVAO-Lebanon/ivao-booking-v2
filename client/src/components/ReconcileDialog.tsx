@@ -40,7 +40,9 @@ export function ReconcileDialog({
   if (summary.confirmPending > 0)
     items.push(`${summary.confirmPending} booking(s) awaiting confirmation will be confirmed immediately.`);
   if (summary.cancelNotify > 0)
-    items.push(`${summary.cancelNotify} pilot(s) with a booking will be emailed that the event is cancelled.`);
+    items.push(
+      `A cancellation notice for ${summary.cancelNotify} pilot(s) will be queued for your approval (no email is sent until you approve it).`
+    );
   if (summary.overLimit > 0)
     items.push(
       `${summary.overLimit} pilot(s) already hold more bookings than the new limit; they keep them and the limit applies to new bookings only.`

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import { PageLoader } from '../../components/ui';
+import { EmailApprovals } from '../../components/EmailApprovals';
 
 function StatTile({
   label,
@@ -26,6 +27,7 @@ function StatTile({
 
 export default function DashboardPage() {
   const { data, isLoading } = useQuery({ queryKey: ['stats'], queryFn: () => api.stats() });
+  const { data: approvals } = useQuery({ queryKey: ['email-approvals'], queryFn: () => api.emailApprovals() });
   if (isLoading || !data) return <PageLoader />;
 
   const load = data.slots > 0 ? Math.round((data.booked / data.slots) * 100) : 0;
@@ -36,6 +38,12 @@ export default function DashboardPage() {
         <div className="eyebrow">Operations</div>
         <h1 className="mt-1 text-2xl font-extrabold sm:text-3xl">Dashboard</h1>
       </div>
+
+      {approvals && approvals.length > 0 && (
+        <div className="mb-6">
+          <EmailApprovals items={approvals} showEventLink />
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatTile label="Total events" value={data.events} accent="#1342E4" />
