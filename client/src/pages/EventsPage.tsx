@@ -1,30 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { EventModel } from '../api/types';
-import { PageLoader, EmptyState, StatusBadge, Pagination, SplitFlap } from '../components/ui';
+import { PageLoader, EmptyState, StatusBadge, Pagination } from '../components/ui';
 import { fmtDateUtc, fmtTimeUtc, relativeToNow } from '../lib/format';
-
-/** Live Zulu time rendered on split-flap board tiles - the signature aviation motif. */
-function HeroClock() {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  const hh = String(now.getUTCHours()).padStart(2, '0');
-  const mm = String(now.getUTCMinutes()).padStart(2, '0');
-  return (
-    <div className="hidden shrink-0 flex-col items-end gap-1.5 sm:flex">
-      <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-fuselage-400">Zulu time</span>
-      <div className="flex items-center gap-1.5">
-        <SplitFlap value={`${hh}:${mm}`} className="text-lg" cellClassName="min-w-[1.4rem] py-1.5" />
-        <span className="font-mono text-sm font-bold text-atmos-300">Z</span>
-      </div>
-    </div>
-  );
-}
 
 function EventCard({ event }: { event: EventModel }) {
   return (
@@ -125,7 +105,6 @@ export default function EventsPage() {
               </p>
             )}
           </div>
-          <HeroClock />
         </div>
       </div>
 
