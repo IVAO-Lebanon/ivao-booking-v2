@@ -3,7 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../lib/theme';
 import { Sun, Moon, Menu, X } from 'lucide-react';
-import { AUTHOR, APP_NAME, APP_TAGLINE, APP_OPERATOR } from '../lib/branding';
+import { IVAO_API_CREDIT, APP_NAME, APP_TAGLINE, APP_OPERATOR } from '../lib/branding';
 import { CedarMark } from './logo';
 
 function UtcClock() {
@@ -173,14 +173,14 @@ export default function Layout() {
 
       <footer className="mt-8 border-t border-fuselage-150 py-6 dark:border-fuselage-800">
         <div className="mx-auto max-w-6xl px-4 text-center text-xs text-fuselage-400">
-          {APP_NAME} - {APP_TAGLINE} by {APP_OPERATOR}, built by{' '}
+          {APP_NAME} - {APP_TAGLINE} by {APP_OPERATOR}. Powered by the{' '}
           <a
-            href={AUTHOR.url}
+            href={IVAO_API_CREDIT.url}
             target="_blank"
             rel="noreferrer"
             className="font-semibold text-atmos-600 hover:underline dark:text-atmos-400"
           >
-            {AUTHOR.name}
+            {IVAO_API_CREDIT.label}
           </a>
           .
         </div>

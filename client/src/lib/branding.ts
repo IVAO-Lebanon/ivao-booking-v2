@@ -48,7 +48,8 @@ export function textureImageUrl(textureId?: number | null): string {
   return textureId ? `${API_BASE}/ref/texture/${textureId}/image` : '';
 }
 
-export const AUTHOR = {
-  name: 'Ahmad Dayeh',
-  url: 'https://www.ivao.aero/Member.aspx?Id=588679',
+// Reference data (airports, aircraft, liveries, live traffic) comes from the IVAO API.
+export const IVAO_API_CREDIT = {
+  label: 'IVAO API',
+  url: 'https://api.ivao.aero',
 };

@@ -47,8 +47,8 @@ const FOOT_BG = '#f7f8fb';
 const MONO = "'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace";
 const SANS = "'Nunito Sans',-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif";
 const HEAD = "'Poppins',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-// Footer credit - matches the website footer + branding.ts AUTHOR.
-const AUTHOR = { name: 'Ahmad Dayeh', url: 'https://www.ivao.aero/Member.aspx?Id=588679' };
+// Footer credit - matches the website footer + branding.ts IVAO_API_CREDIT.
+const IVAO_API_CREDIT = { label: 'IVAO API', url: 'https://api.ivao.aero' };
 // Product/brand name + tagline - mirror the website (client/src/lib/branding.ts).
 const APP_NAME = 'BYBLOS';
 const APP_TAGLINE = 'Flight Booking System';
@@ -155,8 +155,8 @@ ${preheader ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;m
           <td style="vertical-align:middle;font-family:${HEAD};font-size:13px;font-weight:700;color:${INK};">${APP_NAME} <span style="font-family:${MONO};font-size:10px;font-weight:700;letter-spacing:1.5px;color:${MUTED};">· IVAO ${escapeHtml(division || '')}</span></td>
         </tr></table>
         <div style="font-family:${SANS};font-size:12px;line-height:1.7;color:${MUTED};margin-top:8px;">
-          ${APP_TAGLINE} by ${APP_OPERATOR} · built by
-          <a href="${AUTHOR.url}" style="color:${BRAND_MID};font-weight:700;text-decoration:none;">${AUTHOR.name}</a>
+          ${APP_TAGLINE} by ${APP_OPERATOR} · powered by the
+          <a href="${IVAO_API_CREDIT.url}" style="color:${BRAND_MID};font-weight:700;text-decoration:none;">${IVAO_API_CREDIT.label}</a>
         </div>
       </td></tr>
     </table>
@@ -186,7 +186,7 @@ export function buildText(o = {}, ctx = {}) {
   }
   if (o.showEventStrip) lines.push(`EVENT: ${R('{{eventDate}}')} · ${R('{{eventTime}}')} UTC`, '');
   if (o.ctaShow && o.ctaUrl) lines.push(`${R(o.ctaLabel || 'Open')}: ${R(o.ctaUrl)}`, '');
-  lines.push('--', `${APP_NAME} - ${APP_TAGLINE} by ${APP_OPERATOR}`, `Built by ${AUTHOR.name} (${AUTHOR.url})`);
+  lines.push('--', `${APP_NAME} - ${APP_TAGLINE} by ${APP_OPERATOR}`, `Powered by the ${IVAO_API_CREDIT.label} (${IVAO_API_CREDIT.url})`);
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
