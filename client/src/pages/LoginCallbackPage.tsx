@@ -36,7 +36,7 @@ export default function LoginCallbackPage() {
         <>
           <p className="text-lg font-semibold text-red-600">Sign-in failed</p>
           <p className="text-sm text-fuselage-500">{error}</p>
-          <button className="btn-primary mt-2" onClick={() => navigate('/login')}>
+          <button className="btn-primary mt-2" onClick={() => navigate('/login?manual=1')}>
             Back to sign in
           </button>
         </>
