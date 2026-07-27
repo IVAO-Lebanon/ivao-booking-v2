@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
 import type { EventModel } from '../api/types';
-import { ArrowRight } from 'lucide-react';
 import { PageLoader, EmptyState, StatusBadge, Pagination, SplitFlap } from '../components/ui';
 import { fmtDateUtc, fmtTimeUtc, relativeToNow } from '../lib/format';
 
@@ -90,18 +89,6 @@ function EventCard({ event }: { event: EventModel }) {
           )}
         </div>
 
-        {event.airports.length > 0 && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {event.airports.map((a, i) => (
-              <span key={a} className="flex items-center gap-1.5">
-                {i > 0 && <ArrowRight size={12} className="text-atmos-400" aria-hidden />}
-                <span className="rounded bg-fuselage-100 px-1.5 py-0.5 font-mono text-xs font-semibold text-fuselage-600 dark:bg-fuselage-800 dark:text-fuselage-300">
-                  {a}
-                </span>
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </Link>
   );
