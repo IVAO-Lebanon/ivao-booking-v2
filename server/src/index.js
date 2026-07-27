@@ -56,8 +56,12 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 if (config.env !== 'test') app.use(morgan(config.env === 'production' ? 'combined' : 'dev'));
 
-// Basic rate-limiting on auth to slow brute force.
-app.use('/auth', rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, legacyHeaders: false }));
+// Rate-limit only the login endpoints (brute-force surface). Read-only auth routes
+// like /auth/me and /auth/config are hit on every page load, so throttling them would
+// intermittently log active users out; they are intentionally excluded.
+const loginLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, legacyHeaders: false });
+app.use('/auth/dev', loginLimiter);
+app.use('/auth/ivao', loginLimiter);
 
 // Airline logos (PNG named by airline ICAO, e.g. /airline-logo/AAL.png). Missing
 // airlines simply 404 and the client hides the image.
