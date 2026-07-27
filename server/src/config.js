@@ -8,12 +8,17 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const bool = (v, def = false) =>
   v === undefined ? def : ['1', 'true', 'yes', 'on'].includes(String(v).toLowerCase());
 
+const env = process.env.NODE_ENV || 'development';
+const isProd = env === 'production';
+
 export const config = {
   port: Number(process.env.PORT || 4000),
-  env: process.env.NODE_ENV || 'development',
+  env,
+  // Allowed browser origins for CORS. Trailing slashes are stripped so a value
+  // like "https://site/" still matches the Origin header (which has none).
   clientOrigins: (process.env.CLIENT_ORIGINS || 'http://localhost:5173')
     .split(',')
-    .map((s) => s.trim())
+    .map((s) => s.trim().replace(/\/+$/, ''))
     .filter(Boolean),
 
   db: {
@@ -29,7 +34,10 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || 'dev-insecure-secret-change-me',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
 
-  devAuth: bool(process.env.DEV_AUTH, true),
+  // Dev login (POST /auth/dev) issues a session for any VID, including admin, so
+  // it is ALWAYS disabled in production regardless of DEV_AUTH. This way a
+  // forgotten env var can never expose an open admin login on a live server.
+  devAuth: isProd ? false : bool(process.env.DEV_AUTH, true),
 
   ivao: {
     openidConfig: process.env.IVAO_OPENID_CONFIG || 'https://api.ivao.aero/.well-known/openid-configuration',
@@ -62,7 +70,24 @@ export const config = {
   },
 };
 
-if (config.env === 'production' && config.jwtSecret.includes('change-me')) {
+// Production safety checks. A weak JWT secret lets anyone forge admin sessions,
+// so refuse to start rather than run a silently insecure server. CORS and login
+// misconfigurations are only warnings (they fail loudly and visibly at runtime).
+if (isProd) {
+  const fatal = [];
+  if (!process.env.JWT_SECRET || config.jwtSecret.includes('change-me') || config.jwtSecret.length < 32) {
+    fatal.push('JWT_SECRET must be set to a strong random value (32+ characters).');
+  }
+
+  if (fatal.length) {
+    // eslint-disable-next-line no-console
+    console.error('❌ Refusing to start: insecure production configuration:');
+    for (const p of fatal) console.error(`   - ${p}`);
+    process.exit(1);
+  }
+
   // eslint-disable-next-line no-console
-  console.warn('⚠️  JWT_SECRET is not set to a secure value in production!');
+  if (bool(process.env.DEV_AUTH, false)) console.warn('⚠️  DEV_AUTH is ignored in production; dev login stays disabled.');
+  if (!process.env.CLIENT_ORIGINS) console.warn('⚠️  CLIENT_ORIGINS is not set; browsers on your real site will be blocked by CORS.');
+  if (!config.ivao.clientId) console.warn('⚠️  IVAO_CLIENT_ID is not set; with dev login disabled, no one can sign in.');
 }

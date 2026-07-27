@@ -169,7 +169,9 @@ You now have the full project on the server, including both the `server/` and `c
    DB_PASSWORD=the-password-you-chose
    DB_NAME=ivao_booking
 
-   # Security: put a long random string here (32 characters or more):
+   # Security: a long random string (32+ characters). Generate one by running
+   # `openssl rand -hex 32` in a terminal and pasting the result here. In
+   # production the API refuses to start if this is missing or left as a default.
    JWT_SECRET=change-this-to-a-long-random-string
 
    # Your division:
