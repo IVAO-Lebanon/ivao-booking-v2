@@ -3,29 +3,8 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useTheme } from '../lib/theme';
 import { Sun, Moon, Menu, X } from 'lucide-react';
-import { IvaoMark } from './ui';
-import { divisionLogoUrl, AUTHOR } from '../lib/branding';
-
-/** Division logo from IVAO branding, falling back to the generic mark on error. */
-function BrandMark({ division }: { division?: string | null }) {
-  const [failed, setFailed] = useState(false);
-  const url = divisionLogoUrl(division);
-  if (url && !failed) {
-    return (
-      <img
-        src={url}
-        alt={division ? `IVAO ${division}` : 'IVAO'}
-        className="h-9 w-9 rounded-lg bg-white object-contain p-1 shadow-sm ring-1 ring-black/5 dark:ring-white/10"
-        onError={() => setFailed(true)}
-      />
-    );
-  }
-  return (
-    <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-atmos-600 to-atmos-800 text-white shadow-sm shadow-atmos-900/30 transition group-hover:from-atmos-500 group-hover:to-atmos-700">
-      <IvaoMark className="h-6 w-6" />
-    </span>
-  );
-}
+import { AUTHOR, APP_NAME, APP_TAGLINE, APP_OPERATOR } from '../lib/branding';
+import { CedarMark } from './logo';
 
 function UtcClock() {
   const [now, setNow] = useState(() => new Date());
@@ -62,7 +41,6 @@ const ADMIN_NAV = [
   { to: '/admin/event-types', label: 'Event types' },
   { to: '/admin/sceneries', label: 'Sceneries' },
   { to: '/admin/simulators', label: 'Simulators' },
-  { to: '/admin/aircraft', label: 'Aircraft' },
   { to: '/admin/users', label: 'Users' },
 ];
 
@@ -80,10 +58,13 @@ export default function Layout() {
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-30 border-b border-fuselage-150 bg-white/85 backdrop-blur-md dark:border-fuselage-800 dark:bg-fuselage-950/85">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <Link to="/" className="group flex items-center gap-2.5 font-head font-extrabold tracking-tight">
-            <BrandMark division={user?.division || config?.division} />
-            <span className="hidden text-lg leading-none sm:block">
-              IVAO<span className="font-semibold text-atmos-600 dark:text-atmos-400"> Booking</span>
+          <Link to="/" className="group flex items-center gap-2.5 font-head font-extrabold">
+            <CedarMark className="h-7 w-7 shrink-0 text-[#007A3D] dark:text-[#1FCE7A]" />
+            <span className="flex items-baseline gap-2 leading-none">
+              <span className="text-lg tracking-wide text-atmos-700 dark:text-white">{APP_NAME}</span>
+              <span className="hidden font-mono text-[10px] font-semibold uppercase tracking-widest text-atmos-600 dark:text-atmos-400 sm:inline">
+                IVAO{config?.division ? ` ${config.division}` : ''}
+              </span>
             </span>
           </Link>
 
@@ -192,7 +173,7 @@ export default function Layout() {
 
       <footer className="mt-8 border-t border-fuselage-150 py-6 dark:border-fuselage-800">
         <div className="mx-auto max-w-6xl px-4 text-center text-xs text-fuselage-400">
-          This booking system is provided by IVAO{config?.division ? ` ${config.division}` : ''}, built by{' '}
+          {APP_NAME} — {APP_TAGLINE} by {APP_OPERATOR}, built by{' '}
           <a
             href={AUTHOR.url}
             target="_blank"

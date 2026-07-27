@@ -1,7 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { useAuth } from './auth/AuthContext';
-import { divisionLogoUrl } from './lib/branding';
+import { faviconDataUri } from './lib/branding';
 import { PageLoader } from './components/ui';
 import Layout from './components/Layout';
 import EventsPage from './pages/EventsPage';
@@ -21,15 +20,11 @@ const AdminEmailPage = lazy(() => import('./pages/admin/AdminEmailPage'));
 const EventTypesPage = lazy(() => import('./pages/admin/EventTypesPage'));
 const SceneriesPage = lazy(() => import('./pages/admin/SceneriesPage'));
 const SimulatorsPage = lazy(() => import('./pages/admin/SimulatorsPage'));
-const AircraftPage = lazy(() => import('./pages/admin/AircraftPage'));
 const UsersPage = lazy(() => import('./pages/admin/UsersPage'));
 
-/** Sets the browser favicon to the configured division's IVAO logo. */
+/** Sets the browser favicon to the BYBLOS cedar app icon. */
 function DivisionFavicon() {
-  const { config } = useAuth();
   useEffect(() => {
-    const url = divisionLogoUrl(config?.division);
-    if (!url) return;
     let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
     if (!link) {
       link = document.createElement('link');
@@ -37,8 +32,8 @@ function DivisionFavicon() {
       document.head.appendChild(link);
     }
     link.type = 'image/svg+xml';
-    link.href = url;
-  }, [config?.division]);
+    link.href = faviconDataUri();
+  }, []);
   return null;
 }
 
@@ -62,7 +57,6 @@ export default function App() {
           <Route path="event-types" element={<EventTypesPage />} />
           <Route path="sceneries" element={<SceneriesPage />} />
           <Route path="simulators" element={<SimulatorsPage />} />
-          <Route path="aircraft" element={<AircraftPage />} />
           <Route path="users" element={<UsersPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />

@@ -1,11 +1,13 @@
 import axios, { AxiosInstance } from 'axios';
 import type {
   AdminStats,
-  Aircraft,
+  AircraftType,
   AirportBrief,
   EmailResult,
   EmailStatus,
+  EmailRecipient,
   EventLive,
+  IvaoImport,
   EventModel,
   EventTypeModel,
   Paginated,
@@ -47,6 +49,12 @@ export function apiErrorMessage(err: unknown, fallback = 'server.error'): string
   return fallback;
 }
 
+/** Extract the structured `details` an API error may carry (e.g. CSV validation issues). */
+export function apiErrorDetails<T = unknown>(err: unknown): T | undefined {
+  if (axios.isAxiosError(err)) return err.response?.data?.error?.details as T | undefined;
+  return undefined;
+}
+
 class ApiClient {
   private axios: AxiosInstance;
   private token = '';
@@ -86,6 +94,9 @@ class ApiClient {
   createEvent = (data: unknown) => this.axios.post<EventModel>('/event', data).then((r) => r.data);
   updateEvent = (id: number, data: unknown) => this.axios.put<EventModel>(`/event/${id}`, data).then((r) => r.data);
   deleteEvent = (id: number) => this.axios.delete(`/event/${id}`).then(() => {});
+
+  // ── Import published events from the IVAO API (admin, this division only) ──
+  ivaoImport = () => this.axios.get<IvaoImport>('/event/ivao/import').then((r) => r.data);
 
   // ── Live network overlay (Whazzup) ──
   eventLive = (id: number) => this.axios.get<EventLive>(`/event/${id}/live`).then((r) => r.data);
@@ -164,12 +175,9 @@ class ApiClient {
     this.axios.put<SimulatorModel>(`/simulator/${code}`, data).then((r) => r.data);
   deleteSimulator = (code: string) => this.axios.delete(`/simulator/${code}`).then(() => {});
 
-  // ── Aircraft ──
-  aircraft = (params: Record<string, unknown> = {}) =>
-    this.axios.get<Paginated<Aircraft>>('/aircraft', { params }).then((r) => r.data);
-  createAircraft = (data: unknown) => this.axios.post<Aircraft>('/aircraft', data).then((r) => r.data);
-  updateAircraft = (id: number, data: unknown) => this.axios.put<Aircraft>(`/aircraft/${id}`, data).then((r) => r.data);
-  deleteAircraft = (id: number) => this.axios.delete(`/aircraft/${id}`).then(() => {});
+  // ── Aircraft typeahead (live from the IVAO catalogue) ──
+  aircraftSearch = (search: string) =>
+    this.axios.get<AircraftType[]>('/ref/aircraft', { params: { search } }).then((r) => r.data);
 
   // ── Event emails ──
   emailStatus = (eventId: number) =>
@@ -182,6 +190,12 @@ class ApiClient {
     this.axios.post<EmailResult>(`/event/${eventId}/email/report`, body).then((r) => r.data);
   sendNotam = (eventId: number, body: unknown) =>
     this.axios.post<EmailResult>(`/event/${eventId}/email/notam`, body).then((r) => r.data);
+  sendConfirmReminder = (eventId: number, body: unknown) =>
+    this.axios.post<EmailResult>(`/event/${eventId}/email/confirm-reminder`, body).then((r) => r.data);
+  sendTestEmail = (eventId: number, body: unknown) =>
+    this.axios.post<EmailResult & { to: string }>(`/event/${eventId}/email/test`, body).then((r) => r.data);
+  emailRecipients = (eventId: number, emailId: number) =>
+    this.axios.get<EmailRecipient[]>(`/event/${eventId}/email/${emailId}/recipients`).then((r) => r.data);
 
   // ── Users / stats ──
   users = (params: Record<string, unknown> = {}) =>

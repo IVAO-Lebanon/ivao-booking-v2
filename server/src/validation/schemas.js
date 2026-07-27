@@ -76,6 +76,18 @@ export const eventSchema = z.object({
   bookingMessage: z.string().max(2000).optional().or(z.literal('')).nullable(),
   // Offer IVAO-published routes for the flight when booking / viewing details.
   useIvaoRoutes: z.coerce.boolean().default(false),
+  // When true, bookings are provisional and pilots must confirm them; when false,
+  // bookings are instant (auto-booked).
+  requireConfirmation: z.coerce.boolean().default(true),
+  // Hours before start at which confirmation becomes allowed. (max 8760h = 365 days.)
+  confirmOpensHoursBefore: z.coerce.number().int().min(1).max(8760).default(168),
+  // Hours before start after which an unconfirmed booking becomes claimable by other
+  // pilots (it is NOT freed). 0 = never claimable. (max 720h = 30 days.)
+  confirmDeadlineHours: z.coerce.number().int().min(0).max(720).default(0),
+  // Auto confirm-reminder: N hours before start (0 = off), or an explicit UTC time
+  // (unix seconds) which takes precedence.
+  confirmReminderHoursBefore: z.coerce.number().int().min(0).max(8760).default(0),
+  confirmReminderAt: z.coerce.number().int().positive().nullable().optional(),
   airports: z.string().min(4), // comma-separated ICAOs
 });
 
@@ -145,13 +157,6 @@ export const scenerySchema = z.object({
   license: z.enum(['freeware', 'payware']),
   link: z.string().url(),
   simulator: simulatorCode,
-});
-
-export const aircraftSchema = z.object({
-  icao: z.string().regex(/^[A-Z0-9]{2,4}$/),
-  iata: z.string().max(3).default(''),
-  name: z.string().min(1).max(255),
-  speed: z.coerce.number().int().nonnegative(),
 });
 
 export const userUpdateSchema = z.object({

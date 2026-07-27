@@ -2,13 +2,13 @@ import { FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../../api/client';
-import type { EventModel } from '../../api/types';
+import type { EventModel, IvaoImportEvent } from '../../api/types';
 import { Select, Switch } from '@ivao/atmosphere-react';
-import { Modal, Spinner, PageLoader, EmptyState, StatusBadge, Pagination } from '../../components/ui';
-import { Plus, TriangleAlert } from 'lucide-react';
+import { Modal, Spinner, PageLoader, EmptyState, StatusBadge, Pagination, FormError } from '../../components/ui';
+import { Plus, DownloadCloud, ChevronDown, ChevronRight } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 import { useConfirm } from '../../components/Confirm';
-import { friendlyError, fmtUtc } from '../../lib/format';
+import { friendlyError, describeError, fmtUtc } from '../../lib/format';
 
 /** MySQL datetime "YYYY-MM-DD HH:mm:ss" (UTC) -> value for <input datetime-local>. */
 function toLocalInput(mysql?: string | null): string {
@@ -37,12 +37,72 @@ const EMPTY = {
   maxBookingsPerPilot: 0,
   bookingMessage: '',
   useIvaoRoutes: false,
+  requireConfirmation: true,
+  confirmOpensHoursBefore: 168,
+  confirmDeadlineHours: 0,
+  confirmReminderHoursBefore: 0,
+  confirmReminderAt: '',
 };
+
+// Friendly presets so admins never have to think in raw "hours before start".
+const OPENS_PRESETS = [
+  { value: '8760', label: 'As soon as published' },
+  { value: '336', label: '14 days before start' },
+  { value: '168', label: '7 days before start' },
+  { value: '72', label: '3 days before start' },
+  { value: '48', label: '2 days before start' },
+  { value: '24', label: '1 day before start' },
+  { value: '12', label: '12 hours before start' },
+];
+const CLAIM_PRESETS = [
+  { value: '0', label: 'Never — always the pilot’s slot' },
+  { value: '72', label: '3 days before start' },
+  { value: '48', label: '2 days before start' },
+  { value: '24', label: '1 day before start' },
+  { value: '12', label: '12 hours before start' },
+  { value: '6', label: '6 hours before start' },
+];
+const REMIND_PRESETS = [
+  { value: '0', label: 'Don’t send a reminder' },
+  { value: '72', label: '3 days before start' },
+  { value: '48', label: '2 days before start' },
+  { value: '24', label: '1 day before start' },
+  { value: '12', label: '12 hours before start' },
+];
+// Include the current value as a "custom" option if it isn't one of the presets.
+const withCurrent = (items: { value: string; label: string }[], value: string | number) => {
+  const v = String(value);
+  return items.some((i) => i.value === v) ? items : [{ value: v, label: `${v} hours before start` }, ...items];
+};
+const labelOf = (items: { value: string; label: string }[], value: string | number) =>
+  withCurrent(items, value).find((i) => i.value === String(value))?.label ?? `${value}h`;
 
 function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: () => void }) {
   const toast = useToast();
   const qc = useQueryClient();
   const { data: eventTypes } = useQuery({ queryKey: ['event-types'], queryFn: () => api.eventTypes() });
+  // Published IVAO events for this division, offered as a prefill when creating.
+  const { data: ivao, isLoading: ivaoLoading, error: ivaoError } = useQuery({
+    queryKey: ['ivao-import'],
+    queryFn: () => api.ivaoImport(),
+    enabled: !editing,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+  const [importedTitle, setImportedTitle] = useState('');
+  const applyIvao = (ev: IvaoImportEvent) => {
+    setF((s) => ({
+      ...s,
+      eventName: ev.title || s.eventName,
+      description: ev.description || s.description,
+      dateStart: ev.startDate ? toLocalInput(ev.startDate) : s.dateStart,
+      dateEnd: ev.endDate ? toLocalInput(ev.endDate) : s.dateEnd,
+      banner: ev.imageUrl || s.banner,
+      airports: (ev.airports || []).join(','),
+    }));
+    setImportedTitle(ev.title);
+    setError('');
+  };
   const [f, setF] = useState(() =>
     editing
       ? {
@@ -62,18 +122,34 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
           maxBookingsPerPilot: editing.maxBookingsPerPilot ?? 0,
           bookingMessage: editing.bookingMessage || '',
           useIvaoRoutes: Boolean(editing.useIvaoRoutes),
+          requireConfirmation: editing.requireConfirmation == null ? true : Boolean(editing.requireConfirmation),
+          confirmOpensHoursBefore: editing.confirmOpensHoursBefore ?? 168,
+          confirmDeadlineHours: editing.confirmDeadlineHours ?? 0,
+          confirmReminderHoursBefore: editing.confirmReminderHoursBefore ?? 0,
+          confirmReminderAt: editing.confirmReminderAt ? toLocalInput(editing.confirmReminderAt) : '',
         }
       : { ...EMPTY }
   );
 
   const save = useMutation({
     mutationFn: () => {
+      // Numeric fields come off text/number inputs as strings; coerce them (with safe
+      // fallbacks) so an emptied field never reaches the server as "" and trips Zod.
+      const intOr = (v: unknown, fallback: number) => {
+        const n = Math.floor(Number(v));
+        return Number.isFinite(n) ? n : fallback;
+      };
       const payload = {
         ...f,
         dateStart: toUnix(f.dateStart),
         dateEnd: toUnix(f.dateEnd),
         atcBriefing: f.atcBriefing || null,
         pilotBriefing: f.pilotBriefing || null,
+        maxBookingsPerPilot: intOr(f.maxBookingsPerPilot, 0),
+        confirmOpensHoursBefore: intOr(f.confirmOpensHoursBefore, 168),
+        confirmDeadlineHours: intOr(f.confirmDeadlineHours, 0),
+        confirmReminderHoursBefore: intOr(f.confirmReminderHoursBefore, 0),
+        confirmReminderAt: f.requireConfirmation && f.confirmReminderAt ? toUnix(f.confirmReminderAt) : null,
       };
       return editing ? api.updateEvent(editing.id, payload) : api.createEvent(payload);
     },
@@ -83,7 +159,7 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
       toast.success(editing ? 'Event updated.' : 'Event created.');
       onClose();
     },
-    onError: (e) => setError(friendlyError(apiErrorMessage(e))),
+    onError: (e) => setError(describeError(e)),
   });
 
   const set = (k: string) => (e: any) => setF((s) => ({ ...s, [k]: e.target.value }));
@@ -99,6 +175,7 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
   // Inline validation — every field is checked against its expected shape so no
   // stray/random values reach the server; the first problem is shown in the modal.
   const [error, setError] = useState('');
+  const [showTiming, setShowTiming] = useState(false);
   const isUrl = (v: string) => {
     try { const u = new URL(v.trim()); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; }
   };
@@ -119,6 +196,17 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
     if (f.atcBriefing.trim() && !isUrl(f.atcBriefing)) return 'ATC briefing must be a valid URL, or leave it blank.';
     const max = Number(f.maxBookingsPerPilot);
     if (!Number.isInteger(max) || max < 0 || max > 999) return 'Max bookings per pilot must be a whole number from 0 to 999.';
+    if (f.requireConfirmation) {
+      const opens = Number(f.confirmOpensHoursBefore);
+      if (!Number.isInteger(opens) || opens < 1 || opens > 8760) return 'Confirmation opening must be a whole number of hours from 1 to 8760.';
+      const hrs = Number(f.confirmDeadlineHours);
+      if (!Number.isInteger(hrs) || hrs < 0 || hrs > 720) return 'The claim window must be a whole number of hours from 0 to 720 (0 = never claimable).';
+      const rem = Number(f.confirmReminderHoursBefore);
+      if (!Number.isInteger(rem) || rem < 0 || rem > 8760) return 'The reminder time must be a whole number of hours from 0 to 8760 (0 = off).';
+      if (f.confirmReminderAt && (!/^\d{4}-\d{2}-\d{2}$/.test(dayPart(f.confirmReminderAt)) || !isTime(timePart(f.confirmReminderAt)))) return 'The reminder date/time must be a valid date and time (HH:MM, 24h UTC), or leave it blank.';
+      // A specific reminder time after the event has already started would never fire.
+      if (f.confirmReminderAt && isTime(timePart(f.confirmReminderAt)) && toUnix(f.confirmReminderAt) >= toUnix(f.dateStart)) return 'The reminder time must be before the event start.';
+    }
     return '';
   };
 
@@ -134,12 +222,44 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
         }}
         className="space-y-3"
       >
-        {error && (
-          <div className="flex items-start gap-2 rounded-lg border border-danger-300 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-900/50 dark:bg-danger-900/20 dark:text-danger-300">
-            <TriangleAlert size={15} className="mt-0.5 shrink-0" />
-            <span>{error}</span>
+        {!editing && (
+          <div className="rounded-lg border border-atmos-200 bg-atmos-50 px-3 py-3 dark:border-atmos-900/60 dark:bg-atmos-900/20">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-atmos-800 dark:text-atmos-200">
+              <DownloadCloud size={16} /> Import from IVAO
+            </div>
+            {ivaoError ? (
+              <p className="text-xs text-danger-600 dark:text-danger-300">{describeError(ivaoError)}</p>
+            ) : ivaoLoading ? (
+              <p className="text-xs text-fuselage-500 dark:text-fuselage-400">Loading division events…</p>
+            ) : (ivao?.events.length ?? 0) === 0 ? (
+              <p className="text-xs text-fuselage-500 dark:text-fuselage-400">
+                No published IVAO events for division {ivao?.division ?? ''} right now.
+              </p>
+            ) : (
+              <>
+                <Select
+                  position="popper"
+                  value=""
+                  onValueChange={(v) => {
+                    const ev = ivao?.events.find((e) => String(e.id) === v);
+                    if (ev) applyIvao(ev);
+                  }}
+                  placeholder={`Pick an IVAO event for ${ivao?.division} to prefill…`}
+                  items={(ivao?.events ?? []).map((e) => ({
+                    value: String(e.id),
+                    label: `${e.title}${e.startDate ? ` · ${e.startDate.slice(0, 10)}` : ''}${e.airports.length ? ` · ${e.airports.join('/')}` : ''}`,
+                  }))}
+                />
+                {importedTitle && (
+                  <p className="mt-2 text-xs text-success-700 dark:text-success-300">
+                    Prefilled from "{importedTitle}". IVAO does not provide an ATC booking link or briefings, so add those and pick an event type before creating.
+                  </p>
+                )}
+              </>
+            )}
           </div>
         )}
+        <FormError message={error} />
         <div>
           <label className="label">Event name</label>
           <input className="input" value={f.eventName} onChange={set('eventName')} required />
@@ -251,7 +371,79 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
             <Switch checked={f.useIvaoRoutes} onCheckedChange={setBool('useIvaoRoutes')} />
             Offer IVAO-published routes
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <Switch checked={f.requireConfirmation} onCheckedChange={setBool('requireConfirmation')} />
+            Require booking confirmation
+          </label>
         </div>
+        {f.requireConfirmation ? (
+          <div className="space-y-2 rounded-lg border border-fuselage-200 bg-fuselage-50 px-3 py-3 dark:border-fuselage-700 dark:bg-fuselage-900/30">
+            <p className="text-xs text-fuselage-500 dark:text-fuselage-400">
+              Pilots book a provisional slot and must confirm it to secure it. Sensible defaults are already set.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowTiming((v) => !v)}
+              className="flex w-full items-center gap-1.5 text-left text-xs font-semibold text-fuselage-600 hover:text-fuselage-800 dark:text-fuselage-300 dark:hover:text-fuselage-100"
+            >
+              {showTiming ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+              Confirmation timing
+              {!showTiming && (
+                <span className="ml-1 font-normal text-fuselage-400">
+                  opens {labelOf(OPENS_PRESETS, f.confirmOpensHoursBefore).toLowerCase()}
+                  {' · '}
+                  {Number(f.confirmDeadlineHours) ? `claimable ${labelOf(CLAIM_PRESETS, f.confirmDeadlineHours).toLowerCase()}` : 'never claimable'}
+                  {' · '}
+                  {Number(f.confirmReminderHoursBefore) || f.confirmReminderAt ? 'reminder on' : 'no reminder'}
+                </span>
+              )}
+            </button>
+            {showTiming && (
+              <div className="space-y-3 pt-1">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label">Confirmation opens</label>
+                    <Select position="popper" value={String(f.confirmOpensHoursBefore)} onValueChange={setVal('confirmOpensHoursBefore')} items={withCurrent(OPENS_PRESETS, f.confirmOpensHoursBefore)} />
+                  </div>
+                  <div>
+                    <label className="label">Others can claim an unconfirmed slot</label>
+                    <Select position="popper" value={String(f.confirmDeadlineHours)} onValueChange={setVal('confirmDeadlineHours')} items={withCurrent(CLAIM_PRESETS, f.confirmDeadlineHours)} />
+                  </div>
+                </div>
+                <div>
+                  <label className="label">Auto-remind pilots who haven’t confirmed</label>
+                  <Select position="popper" value={String(f.confirmReminderHoursBefore)} onValueChange={setVal('confirmReminderHoursBefore')} items={withCurrent(REMIND_PRESETS, f.confirmReminderHoursBefore)} />
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs text-fuselage-500 dark:text-fuselage-400">…or send it at an exact date &amp; time (UTC)</summary>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <input
+                        type="date"
+                        className="input max-w-[12rem]"
+                        value={dayPart(f.confirmReminderAt)}
+                        onChange={(e) => setF((s) => ({ ...s, confirmReminderAt: e.target.value ? `${e.target.value}T${timePart(s.confirmReminderAt) || '00:00'}` : '' }))}
+                      />
+                      <input
+                        type="text"
+                        placeholder="HH:MM"
+                        className="input max-w-[7rem] text-center font-mono"
+                        value={timePart(f.confirmReminderAt)}
+                        onChange={(e) => setF((s) => ({ ...s, confirmReminderAt: `${dayPart(s.confirmReminderAt) || dayPart(s.dateStart)}T${e.target.value}` }))}
+                      />
+                      {f.confirmReminderAt && (
+                        <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => setF((s) => ({ ...s, confirmReminderAt: '' }))}>Clear</button>
+                      )}
+                      <span className="text-xs text-fuselage-400">overrides the option above</span>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-fuselage-500 dark:text-fuselage-400">
+            Bookings are instant: pilots are booked immediately with no confirmation step.
+          </p>
+        )}
         <div className="flex gap-2 pt-2">
           <button type="button" className="btn-secondary flex-1" onClick={onClose}>
             Cancel
@@ -283,7 +475,7 @@ export default function EventsAdminPage() {
       qc.invalidateQueries({ queryKey: ['admin-events'] });
       toast.success('Event deleted.');
     },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => toast.error(describeError(e)),
   });
 
   return (

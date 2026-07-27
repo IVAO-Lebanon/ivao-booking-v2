@@ -1,18 +1,21 @@
 import { CSSProperties, FormEvent, useState } from 'react';
-import { Plane, Trash2, Pencil, Clock, X } from 'lucide-react';
+import { Plane, Trash2, Pencil, Clock, X, AlertTriangle } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import type { EventModel, Slot } from '../api/types';
 import { Checkbox } from '@ivao/atmosphere-react';
 import { StatusBadge, statusRail, Modal, Spinner } from './ui';
 import { FlightDetailModal } from './FlightDetailModal';
+import { AircraftInput } from './AircraftInput';
+import { AirportInput } from './AirportInput';
+import { DateTimeUtcInput } from './DateTimeUtcInput';
 import { liveStatus, LiveFlightChip } from './LiveEventBoard';
 import type { LiveFlight } from '../api/types';
 import { useToast } from './Toast';
 import { useConfirm } from './Confirm';
 import { useAuth } from '../auth/AuthContext';
 import { AirlineLogo } from './AirlineLogo';
-import { friendlyError, fmtTimeUtc, fmtDateUtc } from '../lib/format';
+import { friendlyError, describeError, fmtTimeUtc, fmtDateUtc } from '../lib/format';
 
 function Route({ slot }: { slot: Slot }) {
   return (
@@ -59,7 +62,7 @@ function EditSlotModal({ event, slot, onClose }: { event: EventModel; slot: Slot
       toast.success('Slot updated.');
       onClose();
     },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => toast.error(describeError(e)),
   });
 
   const up = (k: keyof typeof f) => (e: { target: { value: string } }) =>
@@ -78,15 +81,15 @@ function EditSlotModal({ event, slot, onClose }: { event: EventModel; slot: Slot
           </div>
           <div>
             <label className="label">Aircraft</label>
-            <input className="input font-mono uppercase" value={f.aircraft} onChange={up('aircraft')} placeholder="A320" />
+            <AircraftInput value={f.aircraft} onChange={(v) => setF((s) => ({ ...s, aircraft: v }))} />
           </div>
           <div>
             <label className="label">Origin</label>
-            <input className="input font-mono uppercase" value={f.origin} onChange={up('origin')} placeholder="EGLL" />
+            <AirportInput value={f.origin} onChange={(v) => setF((s) => ({ ...s, origin: v }))} placeholder="EGLL" />
           </div>
           <div>
             <label className="label">Destination</label>
-            <input className="input font-mono uppercase" value={f.destination} onChange={up('destination')} placeholder="LFPG" />
+            <AirportInput value={f.destination} onChange={(v) => setF((s) => ({ ...s, destination: v }))} placeholder="LFPG" />
           </div>
           <div>
             <label className="label">Gate</label>
@@ -94,7 +97,7 @@ function EditSlotModal({ event, slot, onClose }: { event: EventModel; slot: Slot
           </div>
           <div>
             <label className="label">Slot time (UTC)</label>
-            <input type="datetime-local" className="input" value={f.slotTime} onChange={(e) => setF((s) => ({ ...s, slotTime: e.target.value }))} />
+            <DateTimeUtcInput value={f.slotTime} onChange={(v) => setF((s) => ({ ...s, slotTime: v }))} />
           </div>
         </div>
         <div className="flex gap-2 pt-2">
@@ -143,22 +146,22 @@ export function SlotList({
   const cancel = useMutation({
     mutationFn: (id: number) => api.cancel(id),
     onSuccess: () => { invalidate(); toast.success('Booking cancelled.'); },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => toast.error(describeError(e)),
   });
   const confirm = useMutation({
     mutationFn: (id: number) => api.confirm(id),
     onSuccess: () => { invalidate(); toast.success('Slot confirmed!'); },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => toast.error(describeError(e)),
   });
   const remove = useMutation({
     mutationFn: (id: number) => api.deleteSlot(id),
     onSuccess: () => { invalidate(); toast.success('Slot deleted.'); },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => toast.error(describeError(e)),
   });
   const bulk = useMutation({
     mutationFn: (body: { action: string; ids: number[]; minutes?: number }) => api.bulkSlots(event.id, body),
     onSuccess: (r) => { invalidate(); setSelected(new Set()); toast.success(`Updated ${r.affected} slot${r.affected === 1 ? '' : 's'}.`); },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => toast.error(describeError(e)),
   });
 
   const busy = cancel.isPending || confirm.isPending || remove.isPending || bulk.isPending;
@@ -193,12 +196,20 @@ export function SlotList({
 
   function actionsFor(slot: Slot) {
     const isOwner = slot.pilotId != null && user?.id === slot.pilotId;
-    const canBook = slot.bookingStatus === 'free' && !event.hasEnded && event.status === 'scheduled';
+    const eventOpen = !event.hasEnded && event.status === 'scheduled';
+    const canBook = slot.bookingStatus === 'free' && eventOpen;
+    // A slot another pilot is holding but hasn't confirmed past the claim deadline.
+    const canClaim = Boolean(slot.claimable) && !isOwner && eventOpen;
     return (
       <div className="flex flex-wrap items-center justify-end gap-1.5">
-        {!manageMode && canBook && (
+        {!manageMode && isOwner && slot.claimable && (
+          <span className="inline-flex items-center gap-1 rounded-md bg-warning-100 px-2 py-1 text-[11px] font-semibold text-warning-700 dark:bg-warning-900/30 dark:text-warning-300">
+            <AlertTriangle size={12} /> Confirm now — at risk
+          </span>
+        )}
+        {!manageMode && (canBook || canClaim) && (
           <button className="btn-primary px-3 py-1.5 text-xs" onClick={() => onBook(slot)} disabled={busy}>
-            Book
+            {canClaim ? 'Claim' : 'Book'}
           </button>
         )}
         {!manageMode && isOwner && slot.bookingStatus === 'prebooked' && event.canConfirmSlots && (

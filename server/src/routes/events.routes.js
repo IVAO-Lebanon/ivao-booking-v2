@@ -7,8 +7,26 @@ import { eventSchema } from '../validation/schemas.js';
 import { parsePagination, paginated } from '../utils/pagination.js';
 import { withEventState } from '../utils/eventState.js';
 import { audit } from '../utils/audit.js';
+import { getDivisionEvents, hasApiKey } from '../ivao/dataApi.js';
 
 const router = Router();
+
+// Maps a raw IVAO /v1/events entry to the fields the create form needs to prefill.
+function shapeIvaoEvent(e) {
+  return {
+    id: e.id,
+    title: e.title || '',
+    description: e.description || '',
+    startDate: e.startDate || null, // ISO 8601 UTC
+    endDate: e.endDate || null,
+    imageUrl: e.imageUrl || '',
+    infoUrl: e.infoUrl || '',
+    airports: Array.isArray(e.airports) ? e.airports : [],
+    eventType: e.eventType || '',
+    divisions: Array.isArray(e.divisions) ? e.divisions : [],
+    routes: Array.isArray(e.routes) ? e.routes : null,
+  };
+}
 
 function tsToMysql(unixSeconds) {
   return new Date(unixSeconds * 1000).toISOString().slice(0, 19).replace('T', ' ');
@@ -110,6 +128,18 @@ router.get(
 );
 
 // Single event.
+// IVAO event catalogue for this division (admin only) — used to prefill the create form.
+router.get(
+  '/ivao/import',
+  requireAuth,
+  requireAdmin,
+  asyncHandler(async (req, res) => {
+    if (!hasApiKey()) throw new ApiError(503, 'ivao.noApiKey');
+    const events = await getDivisionEvents(config.division);
+    res.json({ division: config.division, events: events.map(shapeIvaoEvent) });
+  })
+);
+
 router.get(
   '/:id',
   optionalAuth,
@@ -139,9 +169,9 @@ router.post(
     const event = await transaction(async (tx) => {
       const result = await tx.query(
         `INSERT INTO events
-          (division, eventName, description, type, status, dateStart, dateEnd, banner, atcBooking, atcBriefing, pilotBriefing, publicAccess, allowBookingAfterStart, maxBookingsPerPilot, bookingMessage, useIvaoRoutes, createdBy)
+          (division, eventName, description, type, status, dateStart, dateEnd, banner, atcBooking, atcBriefing, pilotBriefing, publicAccess, allowBookingAfterStart, maxBookingsPerPilot, bookingMessage, useIvaoRoutes, requireConfirmation, confirmOpensHoursBefore, confirmDeadlineHours, confirmReminderHoursBefore, confirmReminderAt, createdBy)
          VALUES
-          (:division,:eventName,:description,:type,:status,:dateStart,:dateEnd,:banner,:atcBooking,:atcBriefing,:pilotBriefing,:publicAccess,:allowBookingAfterStart,:maxBookingsPerPilot,:bookingMessage,:useIvaoRoutes,:createdBy)`,
+          (:division,:eventName,:description,:type,:status,:dateStart,:dateEnd,:banner,:atcBooking,:atcBriefing,:pilotBriefing,:publicAccess,:allowBookingAfterStart,:maxBookingsPerPilot,:bookingMessage,:useIvaoRoutes,:requireConfirmation,:confirmOpensHoursBefore,:confirmDeadlineHours,:confirmReminderHoursBefore,:confirmReminderAt,:createdBy)`,
         {
           division: req.user.division || config.division,
           eventName: data.eventName,
@@ -159,6 +189,11 @@ router.post(
           maxBookingsPerPilot: data.maxBookingsPerPilot,
           bookingMessage: data.bookingMessage || null,
           useIvaoRoutes: data.useIvaoRoutes ? 1 : 0,
+          requireConfirmation: data.requireConfirmation ? 1 : 0,
+          confirmOpensHoursBefore: data.confirmOpensHoursBefore,
+          confirmDeadlineHours: data.confirmDeadlineHours,
+          confirmReminderHoursBefore: data.confirmReminderHoursBefore,
+          confirmReminderAt: data.confirmReminderAt ? tsToMysql(data.confirmReminderAt) : null,
           createdBy: req.user.id,
         }
       );
@@ -192,7 +227,10 @@ router.put(
           dateStart=:dateStart, dateEnd=:dateEnd, banner=:banner, atcBooking=:atcBooking,
           atcBriefing=:atcBriefing, pilotBriefing=:pilotBriefing, publicAccess=:publicAccess,
           allowBookingAfterStart=:allowBookingAfterStart, maxBookingsPerPilot=:maxBookingsPerPilot,
-          bookingMessage=:bookingMessage, useIvaoRoutes=:useIvaoRoutes
+          bookingMessage=:bookingMessage, useIvaoRoutes=:useIvaoRoutes,
+          requireConfirmation=:requireConfirmation, confirmOpensHoursBefore=:confirmOpensHoursBefore,
+          confirmDeadlineHours=:confirmDeadlineHours, confirmReminderHoursBefore=:confirmReminderHoursBefore,
+          confirmReminderAt=:confirmReminderAt
          WHERE id=:id`,
         {
           id: existing.id,
@@ -211,6 +249,11 @@ router.put(
           maxBookingsPerPilot: data.maxBookingsPerPilot,
           bookingMessage: data.bookingMessage || null,
           useIvaoRoutes: data.useIvaoRoutes ? 1 : 0,
+          requireConfirmation: data.requireConfirmation ? 1 : 0,
+          confirmOpensHoursBefore: data.confirmOpensHoursBefore,
+          confirmDeadlineHours: data.confirmDeadlineHours,
+          confirmReminderHoursBefore: data.confirmReminderHoursBefore,
+          confirmReminderAt: data.confirmReminderAt ? tsToMysql(data.confirmReminderAt) : null,
         }
       );
       await replaceAirports(tx, existing.id, data.airports);

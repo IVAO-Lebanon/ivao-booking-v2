@@ -19,7 +19,7 @@ async function seed() {
 
   console.log('Clearing existing data…');
   await query('SET FOREIGN_KEY_CHECKS = 0');
-  for (const t of ['slots', 'event_airports', 'sceneries', 'aircraft', 'audit_log', 'events', 'users']) {
+  for (const t of ['slots', 'event_airports', 'sceneries', 'audit_log', 'events', 'users']) {
     await query(`TRUNCATE TABLE ${t}`);
   }
   await query('SET FOREIGN_KEY_CHECKS = 1');
@@ -32,17 +32,6 @@ async function seed() {
       ('540003','Jordan','Blake',4,5,'540003@dev.local',:div,:div,0,0),
       ('540004','Casey','Stone',2,4,'540004@dev.local',:div,:div,0,1)`,
     { div: DIV }
-  );
-
-  console.log('Seeding aircraft…');
-  await query(
-    `INSERT INTO aircraft (icao, iata, name, speed) VALUES
-      ('A320','320','Airbus A320',450),
-      ('A21N','21N','Airbus A321neo',460),
-      ('B738','738','Boeing 737-800',453),
-      ('B77W','77W','Boeing 777-300ER',490),
-      ('E190','E90','Embraer 190',447),
-      ('A20N','20N','Airbus A320neo',455)`
   );
 
   console.log('Seeding sceneries…');
@@ -129,6 +118,59 @@ async function seed() {
       `INSERT INTO slots (eventId, destination, isFixedDestination, slotTime, isFixedSlotTime, bookingStatus)
        VALUES (:e, 'EDDF', 1, :time, 1, 'free')`,
       { e: rfeId, time: dt(9, 17, i * 20) }
+    );
+  }
+
+  // A fictional Real Flight Operations event: Beirut (OLBA) <-> Dubai (OMDB) round trip.
+  console.log('Seeding Beirut event…');
+  const beirut = await query(
+    `INSERT INTO events (division, eventName, description, type, status, dateStart, dateEnd, banner, atcBooking, atcBriefing, pilotBriefing, publicAccess, allowBookingAfterStart, maxBookingsPerPilot, bookingMessage, requireConfirmation, confirmDeadlineHours, createdBy)
+     VALUES (:div, :name, :desc, 'rfo', 'scheduled', :ds, :de, :banner, :atc, :atcb, :pb, 1, 0, 2, :msg, 1, 48, :by)`,
+    {
+      div: DIV,
+      name: 'Beirut Sunset Ops',
+      desc: 'Fly the golden hour out of Beirut Rafic Hariri (OLBA). A full evening bank of departures to Dubai and the inbound wave home. Book your slot and fly the real schedule!',
+      ds: dt(7, 15, 0),
+      de: dt(7, 20, 0),
+      banner: 'https://images.unsplash.com/photo-1543906965-f9520aa2ed8a?w=1200',
+      atc: 'https://ivao.aero',
+      atcb: 'https://example.com/olba-atc-brief',
+      pb: 'https://example.com/olba-pilot-brief',
+      msg: 'Connect at least 15 minutes before your slot. Expect runway 16/34 in use and file the standard OLBA SID.',
+      by: adminId,
+    }
+  );
+  const beirutId = beirut.insertId;
+
+  await query(`INSERT INTO event_airports (eventId, icao) VALUES (:e,'OLBA'),(:e,'OMDB')`, { e: beirutId });
+
+  await query(
+    `INSERT INTO sceneries (icao, title, license, link, simulator) VALUES
+      ('OLBA','Beirut Rafic Hariri Intl','payware','https://example.com/olba','msfs2024'),
+      ('OMDB','Dubai International','freeware','https://example.com/omdb','xp12')`
+  );
+
+  // Departures out of OLBA, then the return wave back into OLBA. Real 3-letter callsigns so logos resolve.
+  const olbaOut = [
+    ['MEA401', 'OLBA', 'OMDB', 'A21N', 'A1', 15, 10],
+    ['UAE958', 'OLBA', 'OMDB', 'B77W', 'A3', 15, 25],
+    ['FDB758', 'OLBA', 'OMDB', 'B738', 'B2', 15, 40],
+    ['ETD539', 'OLBA', 'OMAA', 'A320', 'B4', 15, 55],
+    ['QTR419', 'OLBA', 'OTHH', 'A320', 'C1', 16, 10],
+  ];
+  const olbaIn = [
+    ['MEA402', 'OMDB', 'OLBA', 'A21N', 'A1', 18, 20],
+    ['UAE957', 'OMDB', 'OLBA', 'B77W', 'A3', 18, 35],
+    ['THY832', 'LTFM', 'OLBA', 'B738', 'B2', 18, 50],
+    ['AFR562', 'LFPG', 'OLBA', 'A320', 'B4', 19, 5],
+    ['MSR717', 'HECA', 'OLBA', 'A320', 'C1', 19, 20],
+  ];
+
+  for (const [fn, origin, dest, ac, gate, h, m] of [...olbaOut, ...olbaIn]) {
+    await query(
+      `INSERT INTO slots (eventId, flightNumber, isFixedFlightNumber, origin, isFixedOrigin, destination, isFixedDestination, aircraft, isFixedAircraft, gate, slotTime, isFixedSlotTime, bookingStatus)
+       VALUES (:eventId, :fn, 1, :origin, 1, :dest, 1, :ac, 1, :gate, :time, 1, 'free')`,
+      { eventId: beirutId, fn, origin, dest, ac, gate, time: dt(7, h, m) }
     );
   }
 

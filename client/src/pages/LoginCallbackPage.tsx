@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, apiErrorMessage } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import { friendlyError } from '../lib/format';
+import { friendlyError, describeError } from '../lib/format';
 import { Spinner } from '../components/ui';
 
 export default function LoginCallbackPage() {
@@ -27,7 +27,7 @@ export default function LoginCallbackPage() {
         loginWithJwt(jwt);
         navigate('/', { replace: true });
       })
-      .catch((err) => setError(friendlyError(apiErrorMessage(err))));
+      .catch((err) => setError(describeError(err)));
   }, [params, loginWithJwt, navigate]);
 
   return (

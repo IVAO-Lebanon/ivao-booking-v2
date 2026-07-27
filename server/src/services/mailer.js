@@ -27,9 +27,9 @@ function getTransport() {
   return transport;
 }
 
-async function sendOne({ to, subject, html, attachments }) {
+async function sendOne({ to, subject, html, text, attachments }) {
   try {
-    await getTransport().sendMail({ from: config.email.from, to, subject, html, attachments });
+    await getTransport().sendMail({ from: config.email.from, to, subject, html, text, attachments });
     return { to, ok: true };
   } catch (err) {
     return { to, ok: false, error: err.message };

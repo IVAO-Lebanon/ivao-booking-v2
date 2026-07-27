@@ -1,11 +1,14 @@
 import { FormEvent, useState } from 'react';
-import { Megaphone } from 'lucide-react';
+import { Megaphone, AlertTriangle } from 'lucide-react';
+import { AircraftInput } from './AircraftInput';
+import { AirportInput } from './AirportInput';
+import { DateTimeUtcInput } from './DateTimeUtcInput';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage, BookPayload } from '../api/client';
 import type { EventModel, Slot } from '../api/types';
 import { Modal, Spinner } from './ui';
 import { useToast } from './Toast';
-import { friendlyError, fmtUtc } from '../lib/format';
+import { friendlyError, describeError, fmtUtc } from '../lib/format';
 
 /** Converts a datetime-local value (local wall time) to a UTC "YYYY-MM-DD HH:mm:ss". */
 function localInputToUtc(value: string): string {
@@ -35,7 +38,7 @@ export function BookSlotModal({
       toast.success(updated.bookingStatus === 'booked' ? 'Slot booked!' : 'Slot pre-booked. Confirm closer to the event.');
       onClose();
     },
-    onError: (err) => toast.error(friendlyError(apiErrorMessage(err))),
+    onError: (err) => toast.error(describeError(err)),
   });
 
   if (!slot) return null;
@@ -82,6 +85,20 @@ export function BookSlotModal({
     </div>
   );
 
+  // Origin/destination use the airport typeahead (both are required when open).
+  const icaoField = (key: 'origin' | 'destination', label: string, placeholder: string, fixed: boolean, fixedValue: string | null) => (
+    <div>
+      <label className="label">{label}<span className="ml-0.5 text-danger-500">*</span></label>
+      {fixed ? (
+        <div className="input flex items-center bg-fuselage-50 font-mono text-fuselage-500 dark:bg-fuselage-800/60">
+          {fixedValue || 'N/A'} <span className="ml-auto text-[10px] uppercase text-fuselage-400">fixed</span>
+        </div>
+      ) : (
+        <AirportInput value={(form[key] as string) || ''} onChange={(v) => setForm((f) => ({ ...f, [key]: v }))} placeholder={placeholder} required />
+      )}
+    </div>
+  );
+
   return (
     <Modal open onClose={onClose} title="Book this slot">
       <form onSubmit={submit} className="space-y-4">
@@ -96,11 +113,33 @@ export function BookSlotModal({
           </div>
         )}
 
+        {Boolean(event.requireConfirmation) && (
+          <div className="flex gap-2 rounded-lg border border-warning-400 bg-warning-50 px-3 py-2 text-sm text-warning-800 dark:border-warning-900/50 dark:bg-warning-900/20 dark:text-warning-200">
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
+            <p>
+              <span className="font-bold">This booking is provisional.</span> You must confirm it to secure your slot.
+              A <span className="font-semibold">Confirm</span> button appears on the event page once confirmation opens.
+              {event.confirmDeadlineHours > 0
+                ? ` If you have not confirmed by ${event.confirmDeadlineHours} hour${event.confirmDeadlineHours === 1 ? '' : 's'} before the event, another pilot can claim your slot.`
+                : ' Please confirm before the event so your slot is not at risk.'}
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           {field('flightNumber', 'Flight number', 'ABC123', slot.isFixedFlightNumber, slot.flightNumber, true)}
-          {field('aircraft', 'Aircraft (ICAO)', 'A320', slot.isFixedAircraft, slot.aircraft)}
-          {field('origin', 'Origin (ICAO)', 'EGLL', slot.isFixedOrigin, slot.origin, true)}
-          {field('destination', 'Destination (ICAO)', 'LFPG', slot.isFixedDestination, slot.destination, true)}
+          <div>
+            <label className="label">Aircraft (ICAO)</label>
+            {slot.isFixedAircraft ? (
+              <div className="input flex items-center bg-fuselage-50 font-mono text-fuselage-500 dark:bg-fuselage-800/60">
+                {slot.aircraft || 'N/A'} <span className="ml-auto text-[10px] uppercase text-fuselage-400">fixed</span>
+              </div>
+            ) : (
+              <AircraftInput value={form.aircraft || ''} onChange={(v) => setForm((f) => ({ ...f, aircraft: v }))} />
+            )}
+          </div>
+          {icaoField('origin', 'Origin (ICAO)', 'EGLL', slot.isFixedOrigin, slot.origin)}
+          {icaoField('destination', 'Destination (ICAO)', 'LFPG', slot.isFixedDestination, slot.destination)}
         </div>
 
         <div>
@@ -112,12 +151,7 @@ export function BookSlotModal({
               {fmtUtc(slot.slotTime)} <span className="ml-auto text-[10px] uppercase text-fuselage-400">fixed</span>
             </div>
           ) : (
-            <input
-              type="datetime-local"
-              className="input"
-              value={form.slotTime || ''}
-              onChange={(e) => setForm((f) => ({ ...f, slotTime: e.target.value }))}
-            />
+            <DateTimeUtcInput value={form.slotTime || ''} onChange={(v) => setForm((f) => ({ ...f, slotTime: v }))} required />
           )}
         </div>
 

@@ -31,10 +31,29 @@ const airportCache = makeCache();
 const metarCache = makeCache();
 const tafCache = makeCache();
 const aircraftCache = makeCache();
+const eventsCache = makeCache();
 
 async function ivaoGet(path) {
   const res = await fetch(`${BASE}${path}`, { headers: HEADERS() });
   return res;
+}
+
+// Published IVAO events for a division. The events API lives at /v1 (the rest of the
+// Data API is /v2), and there is no server-side division filter, so we fetch the full
+// list and keep only events whose `divisions` array contains our division. Cached 10min.
+export async function getDivisionEvents(division) {
+  const key = `events:${division}`;
+  const cached = eventsCache.get(key);
+  if (cached) return cached.data;
+  const host = BASE.replace(/\/v\d+\/?$/, ''); // https://api.ivao.aero
+  const res = await fetch(`${host}/v1/events`, { headers: HEADERS() });
+  if (!res.ok) throw new Error(`events ${res.status}`);
+  const all = await res.json();
+  const list = Array.isArray(all)
+    ? all.filter((e) => Array.isArray(e.divisions) && e.divisions.includes(division))
+    : [];
+  eventsCache.set(key, list, TEN_MIN);
+  return list;
 }
 
 export async function getAirport(icao) {
@@ -144,6 +163,25 @@ export async function searchAircraft(q) {
   }
   scored.sort((x, y) => x.rank - y.rank || String(x.a.icaoCode).localeCompare(String(y.a.icaoCode)));
   return scored.slice(0, 20).map(({ a }) => mapAircraftType(a));
+}
+
+/**
+ * Returns the subset of ICAO codes NOT present in the IVAO airport catalogue.
+ * If the catalogue is unavailable (no API key / fetch fails), returns an empty set
+ * so an import is never rejected on an existence check we couldn't actually perform.
+ */
+export async function unknownAirports(icaos = []) {
+  const codes = [...new Set(icaos.map((c) => String(c || '').toUpperCase()).filter(Boolean))];
+  if (!hasApiKey() || codes.length === 0) return new Set();
+  let list;
+  try {
+    list = await getAllAirports();
+  } catch {
+    return new Set();
+  }
+  if (!Array.isArray(list) || list.length === 0) return new Set();
+  const known = new Set(list.map((a) => String(a.icao || '').toUpperCase()));
+  return new Set(codes.filter((c) => !known.has(c)));
 }
 
 /** Single aircraft type by ICAO, from the cached IVAO catalogue. */

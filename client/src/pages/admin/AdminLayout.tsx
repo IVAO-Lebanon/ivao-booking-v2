@@ -8,7 +8,6 @@ const TABS = [
   { to: '/admin/event-types', label: 'Event types' },
   { to: '/admin/sceneries', label: 'Sceneries' },
   { to: '/admin/simulators', label: 'Simulators' },
-  { to: '/admin/aircraft', label: 'Aircraft' },
   { to: '/admin/users', label: 'Users' },
 ];
 

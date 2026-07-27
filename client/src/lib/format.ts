@@ -63,6 +63,7 @@ const MESSAGES: Record<string, string> = {
   'book.slotTimeRequired': 'A slot time is required.',
   'book.notPrebooked': 'This slot is not awaiting confirmation.',
   'book.tooEarly': 'It is too early to confirm this slot.',
+  'book.tooLate': 'The confirmation window has closed and this slot has been released.',
   'event.notFound': 'Event not found.',
   'event.invalidType': 'That event type no longer exists. Pick another.',
   'eventType.duplicate': 'An event type with that code already exists.',
@@ -72,11 +73,14 @@ const MESSAGES: Record<string, string> = {
   'event.endBeforeStart': 'End time must be after the start time.',
   'event.noAirports': 'Please provide at least one valid ICAO airport.',
   'event.invalidAirport': 'One of the airports is not a valid 4-letter ICAO code.',
+  'ivao.noApiKey': 'IVAO import is unavailable: no IVAO API key is configured on the server.',
   'slot.notFound': 'Slot not found.',
+  'slot.invalidAirport': 'That airport ICAO does not exist. Check the code (leave it empty for a pilot-fillable slot).',
   'file.required': 'Please choose a CSV file.',
   'file.invalidCsv': 'That file could not be read as CSV.',
   'file.empty': 'The CSV file has no rows.',
   'file.rowInvalid': 'A row in the CSV is invalid.',
+  'file.rowsInvalid': 'The CSV has problems that must be fixed before importing.',
   'file.tooManyRows': 'Too many rows in the CSV (max 2000).',
   'aircraft.duplicate': 'An aircraft with that ICAO already exists.',
   'scenery.invalidSimulator': 'That simulator no longer exists. Pick another.',
@@ -84,14 +88,47 @@ const MESSAGES: Record<string, string> = {
   'simulator.notFound': 'Simulator not found.',
   'simulator.inUse': 'This simulator is used by existing sceneries. Reassign or delete them first.',
   'user.cannotSuspendSelf': 'You cannot suspend your own account.',
-  'validation.failed': 'Please check the highlighted fields.',
+  'validation.failed': 'Some fields are invalid. Please review your entries and try again.',
   'email.alreadySent': 'That email has already been sent for this event (one-time only).',
   'email.noRecipients': 'No recipients with an email address for this audience.',
+  'email.noSelfEmail': 'Your account has no email address on file, so a test cannot be sent.',
   'email.noEventsDept': 'No events-department address configured. Enter one to send.',
   'email.sendFailed': 'The email could not be delivered. Check the SMTP configuration and try again.',
   'server.error': 'Something went wrong. Please try again.',
 };
 
+/** True when the string is a valid absolute http(s) URL. */
+export function isHttpUrl(v: string): boolean {
+  try {
+    const u = new URL(v.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function friendlyError(key: string): string {
   return MESSAGES[key] || key;
+}
+
+/**
+ * Turn an API error into a human message. For a server-side validation failure it
+ * names the specific field(s) that were rejected (the server sends them in
+ * `details.fieldErrors`) instead of a vague "check the fields". Falls back to the
+ * friendly message for the error key.
+ */
+export function describeError(err: unknown): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = (err as any)?.response?.data?.error;
+  const key: string = data?.message || 'server.error';
+  if (key === 'validation.failed' && data?.details) {
+    const parts: string[] = [];
+    const fieldErrors: Record<string, string[]> = data.details.fieldErrors || {};
+    for (const [field, msgs] of Object.entries(fieldErrors)) {
+      if (msgs?.[0]) parts.push(`${field} — ${msgs[0]}`);
+    }
+    for (const m of (data.details.formErrors as string[]) || []) parts.push(m);
+    if (parts.length) return `Please fix: ${parts.join('; ')}.`;
+  }
+  return friendlyError(key);
 }

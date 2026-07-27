@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useToast } from '../components/Toast';
 import { Switch } from '@ivao/atmosphere-react';
-import { Spinner, IvaoMark } from '../components/ui';
+import { Spinner } from '../components/ui';
+import { CedarMark } from '../components/logo';
 import { apiErrorMessage } from '../api/client';
-import { friendlyError } from '../lib/format';
+import { friendlyError, describeError } from '../lib/format';
+import { APP_NAME, APP_TAGLINE, APP_OPERATOR } from '../lib/branding';
 
 export default function LoginPage() {
   const { config, devLogin, signed } = useAuth();
@@ -27,7 +29,7 @@ export default function LoginPage() {
       toast.success('Signed in.');
       navigate('/', { replace: true });
     } catch (err) {
-      toast.error(friendlyError(apiErrorMessage(err)));
+      toast.error(describeError(err));
     } finally {
       setBusy(false);
     }
@@ -54,9 +56,10 @@ export default function LoginPage() {
     <div className="mx-auto max-w-md py-8">
       <div className="card overflow-hidden">
         <div className="bg-gradient-to-br from-atmos-700 to-atmos-900 px-6 py-9 text-center text-white">
-          <IvaoMark className="mx-auto h-14 w-14 text-white" />
-          <h1 className="mt-3 text-2xl font-extrabold">IVAO Booking</h1>
-          <p className="mt-1 text-sm text-atmos-100">Sign in with your IVAO account to book event slots.</p>
+          <CedarMark className="mx-auto h-16 w-16 text-white" />
+          <h1 className="mt-3 text-3xl font-extrabold tracking-wide">{APP_NAME}</h1>
+          <p className="mt-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-atmos-200">{APP_TAGLINE} by {APP_OPERATOR}</p>
+          <p className="mt-3 text-sm text-atmos-100">Sign in with your IVAO account to book event slots.</p>
         </div>
 
         <div className="space-y-5 p-6">

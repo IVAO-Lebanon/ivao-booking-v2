@@ -151,12 +151,6 @@ export function FlightDetailModal({ slot, event, onClose }: { slot: Slot; event?
                 liveryUrl={liveryUrl || undefined}
               />
             </Suspense>
-            {/* Livery name caption (the plane itself flies the route, rendered inside the map). */}
-            {liveryUrl && liveryQ.data?.name && (
-              <span className="pointer-events-none absolute bottom-2 left-3 z-[500] max-w-[70%] truncate rounded bg-black/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-white backdrop-blur">
-                {liveryQ.data.name}
-              </span>
-            )}
           </div>
         ) : depQ.isLoading || arrQ.isLoading ? (
           <div className="flex h-40 items-center justify-center rounded-xl border border-fuselage-150 bg-fuselage-50 dark:border-fuselage-800 dark:bg-fuselage-900/60">

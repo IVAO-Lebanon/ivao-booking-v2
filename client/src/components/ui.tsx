@@ -1,6 +1,17 @@
 import { ReactNode } from 'react';
-import { PlaneLanding, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PlaneLanding, ChevronLeft, ChevronRight, TriangleAlert } from 'lucide-react';
 import { DialogRoot, DialogContent, DialogTitle, DialogTopRightClose } from '@ivao/atmosphere-react';
+
+/** Inline validation/error banner shown inside a form modal. Renders nothing when empty. */
+export function FormError({ message }: { message?: string }) {
+  if (!message) return null;
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-danger-300 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-900/50 dark:bg-danger-900/20 dark:text-danger-300">
+      <TriangleAlert size={15} className="mt-0.5 shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
 
 /**
  * IVAO globe mark — a simplified rendition of the IVAO brand logo

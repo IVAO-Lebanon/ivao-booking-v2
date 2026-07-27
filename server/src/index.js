@@ -11,6 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { config } from './config.js';
 import { pool } from './db/pool.js';
 import { getAllAirports, getAllAircraft, hasApiKey } from './ivao/dataApi.js';
+import { sendDueConfirmReminders } from './services/confirmReminders.js';
 import { errorHandler, notFound } from './middleware/error.js';
 
 import authRoutes from './routes/auth.routes.js';
@@ -21,7 +22,6 @@ import liveRoutes from './routes/live.routes.js';
 import emailRoutes from './routes/emails.routes.js';
 import sceneryRoutes from './routes/sceneries.routes.js';
 import simulatorRoutes from './routes/simulators.routes.js';
-import aircraftRoutes from './routes/aircraft.routes.js';
 import userRoutes from './routes/users.routes.js';
 import airportRoutes from './routes/airports.routes.js';
 import referenceRoutes from './routes/reference.routes.js';
@@ -80,7 +80,6 @@ app.use('/event-type', eventTypeRoutes);
 app.use('/event', eventRoutes);
 app.use('/scenery', sceneryRoutes);
 app.use('/simulator', simulatorRoutes);
-app.use('/aircraft', aircraftRoutes);
 app.use('/user', userRoutes);
 app.use('/airport', airportRoutes);
 app.use('/ref', referenceRoutes);
@@ -113,10 +112,12 @@ async function start() {
     process.exit(1);
   }
   await autoAdvanceEventStatus();
+  await sendDueConfirmReminders();
   setInterval(autoAdvanceEventStatus, 60_000);
+  setInterval(sendDueConfirmReminders, 60_000);
   app.listen(config.port, () => {
     // eslint-disable-next-line no-console
-    console.log(`🛫 IVAO ${config.division} Booking API listening on http://localhost:${config.port}`);
+    console.log(`🛫 BYBLOS · IVAO ${config.division} API listening on http://localhost:${config.port}`);
   });
   // Warm the IVAO airport/aircraft catalogues into memory (no DB storage) so the
   // first typeahead search is instant. Fetched from the IVAO API; cached 24h and

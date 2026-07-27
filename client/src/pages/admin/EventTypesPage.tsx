@@ -4,10 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../../api/client';
 import type { EventTypeModel } from '../../api/types';
 import { Switch } from '@ivao/atmosphere-react';
-import { Modal, Spinner, PageLoader, EmptyState } from '../../components/ui';
+import { Modal, Spinner, PageLoader, EmptyState, FormError } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { useConfirm } from '../../components/Confirm';
-import { friendlyError } from '../../lib/format';
+import { friendlyError, describeError } from '../../lib/format';
 
 const EMPTY = { code: '', name: '', description: '', opsSlots: false, sortOrder: 0 };
 
@@ -15,6 +15,7 @@ function TypeForm({ editing, onClose }: { editing: EventTypeModel | null; onClos
   const toast = useToast();
   const qc = useQueryClient();
   const [f, setF] = useState<typeof EMPTY>(() => (editing ? { ...editing } : { ...EMPTY }));
+  const [error, setError] = useState('');
 
   const save = useMutation({
     mutationFn: () =>
@@ -24,12 +25,31 @@ function TypeForm({ editing, onClose }: { editing: EventTypeModel | null; onClos
       toast.success(editing ? 'Event type updated.' : 'Event type added.');
       onClose();
     },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => setError(describeError(e)),
   });
+
+  const validate = (): string => {
+    if (!editing && !/^[a-z0-9_-]{2,16}$/.test(f.code.trim())) return 'Code must be 2 to 16 characters: lowercase letters, digits, - or _.';
+    if (!f.name.trim()) return 'Enter a name.';
+    if (f.name.length > 80) return 'Name is too long (max 80 characters).';
+    if (f.description.length > 255) return 'Description is too long (max 255 characters).';
+    if (!Number.isInteger(Number(f.sortOrder))) return 'Sort order must be a whole number.';
+    return '';
+  };
 
   return (
     <Modal open onClose={onClose} title={editing ? 'Edit event type' : 'Add event type'}>
-      <form onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
+      <form
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          const err = validate();
+          if (err) { setError(err); return; }
+          setError('');
+          save.mutate();
+        }}
+        className="space-y-3"
+      >
+        <FormError message={error} />
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Code</label>
@@ -89,7 +109,7 @@ export default function EventTypesPage() {
   const del = useMutation({
     mutationFn: (code: string) => api.deleteEventType(code),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['event-types'] }); toast.success('Event type deleted.'); },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => toast.error(describeError(e)),
   });
 
   return (

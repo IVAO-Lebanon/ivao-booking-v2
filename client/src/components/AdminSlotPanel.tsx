@@ -1,11 +1,14 @@
 import { FormEvent, useRef, useState } from 'react';
 import { Plus, Upload, Download, TriangleAlert, CircleCheck, Plane, FileSpreadsheet } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../api/client';
+import { api, apiErrorMessage, apiErrorDetails } from '../api/client';
 import type { EventModel, Slot } from '../api/types';
 import { Modal, Spinner } from './ui';
+import { AircraftInput } from './AircraftInput';
+import { AirportInput } from './AirportInput';
+import { DateTimeUtcInput } from './DateTimeUtcInput';
 import { useToast } from './Toast';
-import { friendlyError, fmtUtc } from '../lib/format';
+import { friendlyError, describeError, fmtUtc } from '../lib/format';
 
 function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () => void }) {
   const toast = useToast();
@@ -28,7 +31,7 @@ function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () =>
       toast.success('Slot created. Empty fields become pilot-fillable.');
       onClose();
     },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => toast.error(describeError(e)),
   });
 
   const set = (k: string) => (e: any) => setF((s) => ({ ...s, [k]: e.target.value.toUpperCase() }));
@@ -53,15 +56,15 @@ function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () =>
           </div>
           <div>
             <label className="label">Aircraft</label>
-            <input className="input font-mono uppercase" value={f.aircraft} onChange={set('aircraft')} placeholder="A320" />
+            <AircraftInput value={f.aircraft} onChange={(v) => setF((s) => ({ ...s, aircraft: v }))} />
           </div>
           <div>
             <label className="label">Origin</label>
-            <input className="input font-mono uppercase" value={f.origin} onChange={set('origin')} placeholder="EGLL" />
+            <AirportInput value={f.origin} onChange={(v) => setF((s) => ({ ...s, origin: v }))} placeholder="EGLL" />
           </div>
           <div>
             <label className="label">Destination</label>
-            <input className="input font-mono uppercase" value={f.destination} onChange={set('destination')} placeholder="LFPG" />
+            <AirportInput value={f.destination} onChange={(v) => setF((s) => ({ ...s, destination: v }))} placeholder="LFPG" />
           </div>
           <div>
             <label className="label">Gate</label>
@@ -69,12 +72,7 @@ function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () =>
           </div>
           <div>
             <label className="label">Slot time (UTC)</label>
-            <input
-              type="datetime-local"
-              className="input"
-              value={f.slotTime}
-              onChange={(e) => setF((s) => ({ ...s, slotTime: e.target.value }))}
-            />
+            <DateTimeUtcInput value={f.slotTime} onChange={(v) => setF((s) => ({ ...s, slotTime: v }))} />
           </div>
         </div>
         <div className="flex gap-2 pt-2">
@@ -221,6 +219,7 @@ export function AdminSlotPanel({ event }: { event: EventModel }) {
   const [showCreate, setShowCreate] = useState(false);
   const [showOverlap, setShowOverlap] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [csvIssues, setCsvIssues] = useState<{ issues: { row: number; field: string; message: string }[]; total: number } | null>(null);
 
   const importMut = useMutation({
     mutationFn: (file: File) => api.importSlots(event.id, file),
@@ -229,7 +228,13 @@ export function AdminSlotPanel({ event }: { event: EventModel }) {
       qc.invalidateQueries({ queryKey: ['slot-counts', event.id] });
       toast.success(`Imported ${r.imported} slots.`);
     },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => {
+      // A validation failure carries the full list of problems — show them so the
+      // admin can fix every one, rather than a single vague toast.
+      const details = apiErrorDetails<{ issues?: { row: number; field: string; message: string }[]; total?: number }>(e);
+      if (details?.issues?.length) setCsvIssues({ issues: details.issues, total: details.total ?? details.issues.length });
+      else toast.error(describeError(e));
+    },
   });
 
   return (
@@ -279,6 +284,42 @@ export function AdminSlotPanel({ event }: { event: EventModel }) {
           onChooseFile={() => fileRef.current?.click()}
           onClose={() => setShowImport(false)}
         />
+      )}
+      {csvIssues && (
+        <Modal open onClose={() => setCsvIssues(null)} title="CSV not imported — fix these first" maxWidth="max-w-2xl">
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 rounded-lg border border-danger-300 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-900/50 dark:bg-danger-900/20 dark:text-danger-300">
+              <TriangleAlert size={15} className="mt-0.5 shrink-0" />
+              <span>
+                Nothing was imported. Found <b>{csvIssues.total}</b> problem{csvIssues.total === 1 ? '' : 's'}
+                {csvIssues.issues.length < csvIssues.total ? ` (showing the first ${csvIssues.issues.length})` : ''}. Fix the file and import again.
+              </span>
+            </div>
+            <div className="max-h-[50vh] overflow-auto scroll-thin rounded-lg border border-fuselage-200 dark:border-fuselage-700">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-fuselage-50 dark:bg-fuselage-800">
+                  <tr className="text-left text-[11px] uppercase tracking-wide text-fuselage-400">
+                    <th className="px-3 py-1.5 font-semibold">Row</th>
+                    <th className="px-3 py-1.5 font-semibold">Field</th>
+                    <th className="px-3 py-1.5 font-semibold">Problem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {csvIssues.issues.map((it, i) => (
+                    <tr key={i} className="border-t border-fuselage-100 dark:border-fuselage-800">
+                      <td className="px-3 py-1.5 font-mono text-fuselage-500">{it.row}</td>
+                      <td className="px-3 py-1.5 font-mono text-fuselage-500">{it.field}</td>
+                      <td className="px-3 py-1.5 text-fuselage-700 dark:text-fuselage-200">{it.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end">
+              <button className="btn-primary" onClick={() => setCsvIssues(null)}>Got it</button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

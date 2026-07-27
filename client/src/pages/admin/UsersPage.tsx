@@ -5,7 +5,7 @@ import type { User } from '../../api/types';
 import { PageLoader, EmptyState, Pagination } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { useAuth } from '../../auth/AuthContext';
-import { friendlyError } from '../../lib/format';
+import { friendlyError, describeError } from '../../lib/format';
 import { pilotRating, atcRating } from '../../lib/ratings';
 
 export default function UsersPage() {
@@ -26,7 +26,7 @@ export default function UsersPage() {
       qc.invalidateQueries({ queryKey: ['admin-users'] });
       toast.success(u.suspended ? 'Pilot suspended.' : 'Pilot reinstated.');
     },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => toast.error(describeError(e)),
   });
 
   return (

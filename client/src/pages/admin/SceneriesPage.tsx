@@ -4,10 +4,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../../api/client';
 import type { Scenery } from '../../api/types';
 import { Select } from '@ivao/atmosphere-react';
-import { Modal, Spinner, PageLoader, EmptyState, Pagination } from '../../components/ui';
+import { Modal, Spinner, PageLoader, EmptyState, Pagination, FormError } from '../../components/ui';
 import { useToast } from '../../components/Toast';
 import { useConfirm } from '../../components/Confirm';
-import { friendlyError } from '../../lib/format';
+import { friendlyError, describeError, isHttpUrl } from '../../lib/format';
 
 const EMPTY = { icao: '', title: '', license: 'freeware', link: '', simulator: 'msfs' };
 
@@ -16,6 +16,7 @@ function SceneryForm({ editing, onClose }: { editing: Scenery | null; onClose: (
   const qc = useQueryClient();
   const { data: sims } = useQuery({ queryKey: ['simulators'], queryFn: () => api.simulators() });
   const [f, setF] = useState(() => (editing ? { ...editing } : { ...EMPTY }));
+  const [error, setError] = useState('');
   const save = useMutation({
     mutationFn: () => (editing ? api.updateScenery(editing.id, f) : api.createScenery(f)),
     onSuccess: () => {
@@ -23,14 +24,34 @@ function SceneryForm({ editing, onClose }: { editing: Scenery | null; onClose: (
       toast.success(editing ? 'Scenery updated.' : 'Scenery added.');
       onClose();
     },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => setError(describeError(e)),
   });
   const set = (k: string) => (e: any) => setF((s: any) => ({ ...s, [k]: e.target.value }));
   const setVal = (k: string) => (v: string) => setF((s: any) => ({ ...s, [k]: v }));
 
+  const validate = (): string => {
+    if (!/^[A-Z]{4}$/.test(f.icao.trim())) return 'ICAO must be a 4-letter code (e.g. EGLL).';
+    if (!f.title.trim()) return 'Enter a title.';
+    if (f.title.length > 255) return 'Title is too long (max 255 characters).';
+    if (!['freeware', 'payware'].includes(f.license)) return 'Pick a license.';
+    if (!f.simulator) return 'Pick a simulator.';
+    if (!isHttpUrl(f.link)) return 'Download link must be a valid http(s) URL.';
+    return '';
+  };
+
   return (
     <Modal open onClose={onClose} title={editing ? 'Edit scenery' : 'Add scenery'}>
-      <form onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
+      <form
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          const err = validate();
+          if (err) { setError(err); return; }
+          setError('');
+          save.mutate();
+        }}
+        className="space-y-3"
+      >
+        <FormError message={error} />
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">ICAO</label>
@@ -94,7 +115,7 @@ export default function SceneriesPage() {
   const del = useMutation({
     mutationFn: (id: number) => api.deleteScenery(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-sceneries'] }); toast.success('Deleted.'); },
-    onError: (e) => toast.error(friendlyError(apiErrorMessage(e))),
+    onError: (e) => toast.error(describeError(e)),
   });
 
   return (

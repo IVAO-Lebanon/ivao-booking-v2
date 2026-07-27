@@ -1,4 +1,4 @@
--- IVAO Booking System, MySQL schema
+-- BYBLOS — Flight Booking System (IVAO), MySQL schema
 -- Charset/engine chosen for broad MySQL 8 / MariaDB compatibility.
 
 CREATE TABLE IF NOT EXISTS users (
@@ -61,6 +61,20 @@ CREATE TABLE IF NOT EXISTS events (
   maxBookingsPerPilot   INT          NOT NULL DEFAULT 0,
   bookingMessage        VARCHAR(2000) NULL,
   useIvaoRoutes         TINYINT(1)   NOT NULL DEFAULT 0,
+  -- When 1, a booking is provisional (prebooked) and the pilot must confirm it.
+  -- When 0, a booking is instant (auto-booked straight to 'booked').
+  requireConfirmation   TINYINT(1)   NOT NULL DEFAULT 1,
+  -- Hours before dateStart at which confirmation becomes allowed (the confirm window
+  -- opens). Admin-tunable; default 168h (7 days). Only used when requireConfirmation=1.
+  confirmOpensHoursBefore INT        NOT NULL DEFAULT 168,
+  -- Hours before dateStart after which a still-unconfirmed prebooked slot becomes
+  -- CLAIMABLE by other pilots (it is NOT freed; the holder keeps it until someone
+  -- else claims it, and can still confirm to secure it). 0 = never claimable.
+  confirmDeadlineHours  INT          NOT NULL DEFAULT 0,
+  -- Auto confirm-reminder scheduling: send this many hours before start (0 = off),
+  -- or at an explicit UTC time (confirmReminderAt, which takes precedence when set).
+  confirmReminderHoursBefore INT     NOT NULL DEFAULT 0,
+  confirmReminderAt     DATETIME     NULL,
   createdBy             BIGINT UNSIGNED NULL,
   createdAt             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -112,15 +126,6 @@ CREATE TABLE IF NOT EXISTS sceneries (
   CONSTRAINT fk_sceneries_sim FOREIGN KEY (simulator) REFERENCES simulators(code) ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS aircraft (
-  id     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  icao   VARCHAR(4)  NOT NULL,
-  iata   VARCHAR(3)  NOT NULL DEFAULT '',
-  name   VARCHAR(255) NOT NULL,
-  speed  INT NOT NULL DEFAULT 0,
-  UNIQUE KEY uq_aircraft_icao (icao)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 CREATE TABLE IF NOT EXISTS slots (
   id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   eventId             BIGINT UNSIGNED NOT NULL,
@@ -168,7 +173,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE TABLE IF NOT EXISTS event_emails (
   id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   eventId     BIGINT UNSIGNED NOT NULL,
-  type        ENUM('reminder','report','notam') NOT NULL,
+  type        ENUM('reminder','report','notam','confirm-reminder') NOT NULL,
   -- 'once' for reminder/report (so the UNIQUE key blocks a second send), a unique
   -- token per notam (so NOTAMs are unlimited).
   onceKey     VARCHAR(40) NOT NULL DEFAULT 'once',
@@ -180,4 +185,18 @@ CREATE TABLE IF NOT EXISTS event_emails (
   createdAt   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_event_emails_once (eventId, type, onceKey),
   CONSTRAINT fk_event_emails_event FOREIGN KEY (eventId) REFERENCES events(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Per-recipient delivery result for each sent email (who it went to + ok/failed).
+CREATE TABLE IF NOT EXISTS event_email_recipients (
+  id        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  emailId   BIGINT UNSIGNED NOT NULL,
+  vid       VARCHAR(16) NOT NULL DEFAULT '',
+  name      VARCHAR(160) NOT NULL DEFAULT '',
+  email     VARCHAR(255) NOT NULL DEFAULT '',
+  ok        TINYINT(1) NOT NULL DEFAULT 0,
+  error     VARCHAR(255) NULL,
+  createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_eer_email (emailId),
+  CONSTRAINT fk_eer_email FOREIGN KEY (emailId) REFERENCES event_emails(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

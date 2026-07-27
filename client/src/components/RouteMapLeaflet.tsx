@@ -46,10 +46,12 @@ export function RouteMapLeaflet({ dep, arr, liveryUrl }: { dep: Pt; arr: Pt; liv
         : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
     L.tileLayer(tiles, { attribution: '© OpenStreetMap contributors © CARTO', subdomains: 'abcd', maxZoom: 19 }).addTo(map);
 
-    const arc = greatCircle(dep, arr);
-    // Soft glow under a crisp, flowing dashed line.
-    L.polyline(arc, { color: '#1342E4', weight: 9, opacity: 0.16, lineCap: 'round' }).addTo(map);
-    const line = L.polyline(arc, { color: '#9DB8E0', weight: 2.5, opacity: 0.95, dashArray: '1 9', lineCap: 'round', className: 'rm-flow' }).addTo(map);
+    const arc = greatCircle(dep, arr, 256);
+    // Soft glow under the planned route (faint, flowing dashed line), plus a solid
+    // "flown" trail that grows behind the aircraft to show progress along the path.
+    L.polyline(arc, { color: '#1342E4', weight: 9, opacity: 0.14, lineCap: 'round' }).addTo(map);
+    const line = L.polyline(arc, { color: '#9DB8E0', weight: 2.5, opacity: 0.85, dashArray: '1 9', lineCap: 'round', className: 'rm-flow' }).addTo(map);
+    const flown = L.polyline([], { color: '#335CEE', weight: 3.5, opacity: 0.95, lineCap: 'round' }).addTo(map);
 
     const node = (latlng: [number, number], color: string, icao: string, role: 'dep' | 'arr') => {
       L.circleMarker(latlng, { radius: 13, stroke: false, fillColor: color, fillOpacity: 0.16 }).addTo(map); // halo
@@ -67,57 +69,80 @@ export function RouteMapLeaflet({ dep, arr, liveryUrl }: { dep: Pt; arr: Pt; liv
     let plane: HTMLImageElement | null = null;
     const N = arc.length;
     if (liveryUrl && N >= 2) {
+      const HW = 56, HH = 38; // half the plane image size (112 x 76)
       plane = document.createElement('img');
       plane.src = liveryUrl;
+      // NOTE: no CSS `filter` (drop-shadow) — a filtered layer gets snapped to whole
+      // device pixels, which shows as vibration when the plane creeps sub-pixel per
+      // frame (i.e. when zoomed out). Plain transforms stay sub-pixel smooth.
       Object.assign(plane.style, {
-        position: 'absolute', left: '0', top: '0', width: '150px', height: '100px',
+        position: 'absolute', left: '0', top: '0', width: '112px', height: '76px',
         objectFit: 'contain', transformOrigin: 'center', pointerEvents: 'none', zIndex: '500',
-        filter: 'drop-shadow(0 6px 16px rgba(0,0,0,.55))', willChange: 'transform,left,top',
-        opacity: '0', transition: 'opacity .4s',
+        willChange: 'transform, opacity', backfaceVisibility: 'hidden', opacity: '0',
       });
       map.getContainer().appendChild(plane);
-      plane.onload = () => plane && (plane.style.opacity = '1');
+      let ready = false;
+      plane.onload = () => { ready = true; };
 
-      const DURATION = 18000; // one dep→arr pass, then loops
-      const MIN = 0.42, MAX = 1;
-      // Heading is measured over a window of the route (~6%) so it stays stable even
-      // when the whole route is zoomed out and adjacent points are sub-pixel apart.
-      const LOOK = Math.max(2, Math.round(N * 0.06));
+      const DURATION = 22000; // one dep→arr cruise, then loops seamlessly
+      const FADE = 0.06; // fraction of the loop faded in/out to hide the loop seam
+      const MIN = 0.52, MAX = 0.95; // scale: small on the ground, largest at cruise
       const east = arr.lon > dep.lon;
       const sx = east ? -1 : 1;
+
+      // The aircraft flies a single CONTINUOUS quadratic Bézier (3 screen anchors),
+      // NOT the 256 discrete arc samples. A smooth parametric curve with an analytic
+      // tangent has no per-point stepping, so it stays smooth at any zoom — including
+      // zoomed way out where the plane creeps only a fraction of a pixel per frame.
+      // The control point is placed so the curve passes through the real mid-arc point,
+      // giving it the same bow as the drawn great-circle line.
+      const midIdx = Math.floor((N - 1) / 2);
+      let p0x = 0, p0y = 0, p1x = 0, p1y = 0, p2x = 0, p2y = 0;
+      const recompute = () => {
+        const a = map.latLngToContainerPoint([arc[0][0], arc[0][1]]);
+        const b = map.latLngToContainerPoint([arc[N - 1][0], arc[N - 1][1]]);
+        const m = map.latLngToContainerPoint([arc[midIdx][0], arc[midIdx][1]]);
+        p0x = a.x; p0y = a.y; p2x = b.x; p2y = b.y;
+        p1x = 2 * m.x - (p0x + p2x) / 2;
+        p1y = 2 * m.y - (p0y + p2y) / 2;
+      };
+      recompute();
+      map.on('move zoom resize', recompute);
+
+      let lastI = -1;
       const startT = performance.now();
-      const proj = (pt: [number, number]) => map.latLngToContainerPoint([pt[0], pt[1]]);
-      let rotState: number | null = null; // smoothed rotation
 
       const tick = (now: number) => {
         if (plane) {
-          const t = ((now - startT) % DURATION) / DURATION;
-          const fpos = t * (N - 1);
-          const i = Math.max(0, Math.min(N - 2, Math.floor(fpos)));
-          const frac = fpos - i;
-          const pa = proj(arc[i]);
-          const pb = proj(arc[i + 1]);
-          const cx = pa.x + (pb.x - pa.x) * frac;
-          const cy = pa.y + (pb.y - pa.y) * frac;
+          const t = ((now - startT) % DURATION) / DURATION; // 0→1 constant-speed cruise
+          const mt = 1 - t;
+          // Position on the Bézier + its analytic tangent (for a jitter-free heading).
+          const cx = mt * mt * p0x + 2 * mt * t * p1x + t * t * p2x;
+          const cy = mt * mt * p0y + 2 * mt * t * p1y + t * t * p2y;
+          const tanx = 2 * mt * (p1x - p0x) + 2 * t * (p2x - p1x);
+          const tany = 2 * mt * (p1y - p0y) + 2 * t * (p2y - p1y);
+          const deg = (Math.atan2(tany, tanx) * 180) / Math.PI;
+          const rot = east ? deg : deg + 180;
 
-          const lo = proj(arc[Math.max(0, i - LOOK)]);
-          const hi = proj(arc[Math.min(N - 1, i + LOOK)]);
-          const dx = hi.x - lo.x, dy = hi.y - lo.y;
-          if (Math.hypot(dx, dy) > 3) {
-            const deg = (Math.atan2(dy, dx) * 180) / Math.PI;
-            const target = east ? deg : deg + 180;
-            if (rotState === null) rotState = target;
-            const d = ((target - rotState + 540) % 360) - 180; // shortest signed delta
-            rotState += d * 0.06; // gentle low-pass smoothing (slower turn)
+          // Grow the flown trail along the real arc (updated only on segment change).
+          const i = Math.min(N - 1, Math.floor(t * (N - 1)));
+          if (i !== lastI) {
+            flown.setLatLngs(arc.slice(0, i + 1) as [number, number][]);
+            lastI = i;
           }
-          const s = MIN + (MAX - MIN) * Math.sin(t * Math.PI);
-          plane.style.left = `${cx - 75}px`;
-          plane.style.top = `${cy - 50}px`;
-          plane.style.transform = `rotate(${rotState ?? 0}deg) scale(${s}) scaleX(${sx})`;
+
+          const s = MIN + (MAX - MIN) * Math.sin(t * Math.PI); // climb · cruise · descend
+          const fade = t < FADE ? t / FADE : t > 1 - FADE ? (1 - t) / FADE : 1;
+          plane.style.opacity = ready ? String(fade) : '0';
+          plane.style.transform =
+            `translate3d(${cx - HW}px, ${cy - HH}px, 0) rotate(${rot}deg) scale(${s}) scaleX(${sx})`;
         }
         raf = requestAnimationFrame(tick);
       };
       raf = requestAnimationFrame(tick);
+
+      // Re-project once the modal has settled to its final size.
+      setTimeout(recompute, 200);
     }
 
     const t = setTimeout(() => map.invalidateSize(), 150);

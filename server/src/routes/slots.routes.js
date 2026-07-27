@@ -11,6 +11,7 @@ import { findConflict } from '../utils/overlap.js';
 import { eventState } from '../utils/eventState.js';
 import { parseCsv, toCsv } from '../utils/csv.js';
 import { audit } from '../utils/audit.js';
+import { unknownAirports } from '../ivao/dataApi.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
@@ -91,15 +92,19 @@ router.get(
        LIMIT ${perPage} OFFSET ${offset}`,
       params
     );
-    res.json(paginated(rows.map(shapeSlot), total, page, perPage));
+    const { pastConfirmDeadline } = eventState(event);
+    res.json(paginated(rows.map((r) => shapeSlot(r, { pastConfirmDeadline })), total, page, perPage));
   })
 );
 
-function shapeSlot(row) {
+function shapeSlot(row, opts = {}) {
   const owner = row.pilotId
     ? { vid: row.ownerVid, firstName: row.ownerFirstName, lastName: row.ownerLastName }
     : null;
   const { ownerVid, ownerFirstName, ownerLastName, ...slot } = row;
+  // A slot is "claimable" when it is still provisional (prebooked) and the event has
+  // passed its claim deadline: the holder keeps it, but another pilot may take it over.
+  const claimable = Boolean(opts.pastConfirmDeadline) && slot.bookingStatus === 'prebooked';
   return {
     ...slot,
     isFixedFlightNumber: Boolean(slot.isFixedFlightNumber),
@@ -108,6 +113,7 @@ function shapeSlot(row) {
     isFixedSlotTime: Boolean(slot.isFixedSlotTime),
     isFixedAircraft: Boolean(slot.isFixedAircraft),
     isPrivate: Boolean(slot.isPrivate),
+    claimable,
     owner,
   };
 }
@@ -143,7 +149,8 @@ router.get(
        ORDER BY slotTime ASC LIMIT ${perPage} OFFSET ${offset}`,
       params
     );
-    res.json(paginated(rows.map(shapeSlot), total, page, perPage));
+    const { pastConfirmDeadline } = eventState(event);
+    res.json(paginated(rows.map((r) => shapeSlot(r, { pastConfirmDeadline })), total, page, perPage));
   })
 );
 
@@ -192,6 +199,14 @@ router.get(
   })
 );
 
+// Rejects any non-empty airport code that isn't a real IVAO airport (an empty
+// origin/destination is allowed — that's an open/private slot). No-ops if the IVAO
+// catalogue is unavailable, so we never block on a check we can't perform.
+async function assertAirportsExist(...icaos) {
+  const bad = await unknownAirports(icaos.filter(Boolean));
+  if (bad.size) throw new ApiError(422, 'slot.invalidAirport', { airports: [...bad] });
+}
+
 /* ─────────────────────────── CREATE (admin) ─────────────────────────── */
 router.post(
   '/event/:eventId/slot',
@@ -200,6 +215,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const event = await getEventOr404(req.params.eventId);
     const data = slotSchema.parse(normalizeSlotInput(req.body));
+    await assertAirportsExist(data.origin, data.destination);
 
     const fields = {
       eventId: event.id,
@@ -248,29 +264,60 @@ router.post(
     if (!Array.isArray(records) || records.length === 0) throw new ApiError(422, 'file.empty');
     if (records.length > 2000) throw new ApiError(422, 'file.tooManyRows');
 
-    const prepared = [];
+    // Validate EVERY row up-front and collect all problems, so the admin sees the full
+    // list of what to fix rather than one error at a time. Nothing is imported unless
+    // the whole file is clean. Empty origin/destination is allowed (an open/private slot).
+    const issues = [];
+    const valid = [];
+    const FIELD_LABEL = { flightNumber: 'flight number', origin: 'origin', destination: 'destination', aircraft: 'aircraft', gate: 'gate', slotTime: 'slot time', route: 'route' };
     for (const [i, raw] of records.entries()) {
       const parsed = slotSchema.safeParse(normalizeSlotInput(raw));
       if (!parsed.success) {
-        throw new ApiError(422, 'file.rowInvalid', { row: i + 1, issues: parsed.error.flatten() });
+        const flat = parsed.error.flatten();
+        for (const [field, msgs] of Object.entries(flat.fieldErrors)) {
+          issues.push({ row: i + 1, field, message: `${FIELD_LABEL[field] || field}: ${msgs[0]}` });
+        }
+        for (const m of flat.formErrors || []) issues.push({ row: i + 1, field: '(row)', message: m });
+        continue;
       }
-      const d = parsed.data;
-      prepared.push({
-        eventId: event.id,
-        flightNumber: d.flightNumber ?? null,
-        isFixedFlightNumber: d.flightNumber ? 1 : 0,
-        origin: d.origin ?? null,
-        isFixedOrigin: d.origin ? 1 : 0,
-        destination: d.destination ?? null,
-        isFixedDestination: d.destination ? 1 : 0,
-        aircraft: d.aircraft ?? null,
-        isFixedAircraft: d.aircraft ? 1 : 0,
-        slotTime: d.slotTime ? d.slotTime.replace('T', ' ').slice(0, 19) : null,
-        isFixedSlotTime: d.slotTime ? 1 : 0,
-        gate: d.gate ?? null,
-        isPrivate: d.origin && d.destination ? 0 : 1,
-      });
+      valid.push({ i, d: parsed.data });
     }
+
+    // Verify that every non-empty airport code is a real IVAO airport (catches typos
+    // that still look like valid 4-letter codes, e.g. "EGLX").
+    const codes = new Set();
+    for (const { d } of valid) {
+      if (d.origin) codes.add(d.origin);
+      if (d.destination) codes.add(d.destination);
+    }
+    const bad = await unknownAirports([...codes]);
+    if (bad.size) {
+      for (const { i, d } of valid) {
+        if (d.origin && bad.has(d.origin)) issues.push({ row: i + 1, field: 'origin', message: `origin: "${d.origin}" is not a known airport ICAO` });
+        if (d.destination && bad.has(d.destination)) issues.push({ row: i + 1, field: 'destination', message: `destination: "${d.destination}" is not a known airport ICAO` });
+      }
+    }
+
+    if (issues.length) {
+      issues.sort((a, b) => a.row - b.row);
+      throw new ApiError(422, 'file.rowsInvalid', { issues: issues.slice(0, 200), total: issues.length, rows: records.length });
+    }
+
+    const prepared = valid.map(({ d }) => ({
+      eventId: event.id,
+      flightNumber: d.flightNumber ?? null,
+      isFixedFlightNumber: d.flightNumber ? 1 : 0,
+      origin: d.origin ?? null,
+      isFixedOrigin: d.origin ? 1 : 0,
+      destination: d.destination ?? null,
+      isFixedDestination: d.destination ? 1 : 0,
+      aircraft: d.aircraft ?? null,
+      isFixedAircraft: d.aircraft ? 1 : 0,
+      slotTime: d.slotTime ? d.slotTime.replace('T', ' ').slice(0, 19) : null,
+      isFixedSlotTime: d.slotTime ? 1 : 0,
+      gate: d.gate ?? null,
+      isPrivate: d.origin && d.destination ? 0 : 1,
+    }));
 
     await transaction(async (tx) => {
       for (const f of prepared) {
@@ -295,6 +342,7 @@ router.put(
     const slot = await queryOne('SELECT * FROM slots WHERE id=:id', { id: req.params.slotId });
     if (!slot) throw new ApiError(404, 'slot.notFound');
     const data = slotSchema.parse(normalizeSlotInput(req.body));
+    await assertAirportsExist(data.origin, data.destination);
 
     await query(
       `UPDATE slots SET
@@ -419,13 +467,17 @@ router.patch(
       if (state.hasEnded) throw new ApiError(422, 'book.hasEnded');
 
       if (action === 'book') {
-        if (slot.bookingStatus !== 'free' && String(slot.pilotId) !== String(user.id)) {
+        const isOwner = slot.pilotId != null && String(slot.pilotId) === String(user.id);
+        // A prebooked slot past its claim deadline can be taken over by another pilot.
+        const claimable = slot.bookingStatus === 'prebooked' && state.pastConfirmDeadline;
+        if (slot.bookingStatus !== 'free' && !isOwner && !claimable) {
           throw new ApiError(422, 'book.alreadyTaken');
         }
         if (state.hasStarted && !event.allowBookingAfterStart) throw new ApiError(422, 'book.hasStarted');
 
-        // Per-pilot booking cap (0 = unlimited). Only applies to newly-taken slots.
-        if (event.maxBookingsPerPilot > 0 && slot.bookingStatus === 'free') {
+        // Per-pilot booking cap (0 = unlimited). Applies whenever the pilot takes a
+        // slot they don't already hold (a fresh booking or a claim from someone else).
+        if (event.maxBookingsPerPilot > 0 && !isOwner) {
           const count = (
             await tx.query(
               "SELECT COUNT(*) c FROM slots WHERE eventId=:e AND pilotId=:pid AND bookingStatus<>'free'",
@@ -452,6 +504,11 @@ router.patch(
         if (!merged.flightNumber) throw new ApiError(422, 'book.flightNumberRequired');
         if (!merged.origin || !merged.destination) throw new ApiError(422, 'book.routeRequired');
         if (!merged.slotTime) throw new ApiError(422, 'book.slotTimeRequired');
+        // Pilot-supplied airports must be real (fixed staff-set ones aren't re-checked).
+        await assertAirportsExist(
+          slot.isFixedOrigin ? null : merged.origin,
+          slot.isFixedDestination ? null : merged.destination
+        );
 
         // No duplicate (non-fixed) flight number within the same event.
         const dup = await tx.queryOne(
@@ -468,7 +525,9 @@ router.patch(
         const candidate = { ...slot, ...merged, eventId: event.id };
         if (findConflict(candidate, others)) throw new ApiError(422, 'book.overlapping');
 
-        const bookingStatus = state.canAutoBook ? 'booked' : 'prebooked';
+        // When the event doesn't require confirmation, the booking is instant.
+        // Otherwise it is provisional (prebooked) until the pilot confirms.
+        const bookingStatus = state.requireConfirmation ? 'prebooked' : 'booked';
         await tx.query(
           `UPDATE slots SET pilotId=:pid, flightNumber=:flightNumber, origin=:origin, destination=:destination,
              aircraft=:aircraft, slotTime=:slotTime, gate=:gate, route=:route,

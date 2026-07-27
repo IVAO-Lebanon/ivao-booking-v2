@@ -45,7 +45,7 @@ export const config = {
     secure: bool(process.env.SMTP_SECURE, false),
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
-    from: process.env.MAIL_FROM || 'IVAO Booking <no-reply@ivao.aero>',
+    from: process.env.MAIL_FROM || 'BYBLOS <no-reply@ivao.aero>',
     eventsDept: process.env.EVENTS_DEPT_EMAIL || '',
   },
 

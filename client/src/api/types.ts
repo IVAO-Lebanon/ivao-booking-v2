@@ -57,13 +57,45 @@ export interface EventModel {
   maxBookingsPerPilot: number;
   bookingMessage: string | null;
   useIvaoRoutes: number | boolean;
+  requireConfirmation: number | boolean;
+  confirmOpensHoursBefore: number;
+  confirmDeadlineHours: number;
+  confirmReminderHoursBefore: number;
+  confirmReminderAt: string | null;
   airports: string[];
   sceneries: Scenery[];
   hasStarted: boolean;
   hasEnded: boolean;
   inProgress: boolean;
   canConfirmSlots: boolean;
-  canAutoBook: boolean;
+  pastConfirmDeadline: boolean;
+  confirmOpensAt: string | null;
+  confirmDeadline: string | null;
+}
+
+export interface IvaoEventRoute {
+  departureIcao: string;
+  arrivalIcao: string;
+  route: string;
+}
+
+export interface IvaoImportEvent {
+  id: number;
+  title: string;
+  description: string;
+  startDate: string | null;
+  endDate: string | null;
+  imageUrl: string;
+  infoUrl: string;
+  airports: string[];
+  eventType: string;
+  divisions: string[];
+  routes: IvaoEventRoute[] | null;
+}
+
+export interface IvaoImport {
+  division: string;
+  events: IvaoImportEvent[];
 }
 
 export type BookingStatus = 'free' | 'prebooked' | 'booked';
@@ -93,6 +125,7 @@ export interface Slot {
   route: string | null;
   bookingStatus: BookingStatus;
   bookingTime: string | null;
+  claimable?: boolean;
   owner: SlotOwner | null;
 }
 
@@ -110,12 +143,14 @@ export interface AirportBrief {
   taf: string | null;
 }
 
-export interface Aircraft {
-  id: number;
+// An aircraft type from the IVAO catalogue (typeahead results).
+export interface AircraftType {
   icao: string;
-  iata: string;
-  name: string;
-  speed: number;
+  iata: string | null;
+  model: string;
+  description?: string | null;
+  wtc?: string | null;
+  manufacturer?: string | null;
 }
 
 export interface Paginated<T> {
@@ -181,16 +216,36 @@ export interface EmailFields {
   to?: string;
 }
 
+export interface EmailLogEntry {
+  id: number;
+  type: string;
+  subject: string;
+  recipients: number;
+  sent: number;
+  failed: number;
+  createdAt: string;
+}
+
+export interface EmailRecipient {
+  vid: string;
+  name: string;
+  ok: boolean;
+  error: string | null;
+  createdAt: string;
+}
+
 export interface EmailStatus {
   configured: boolean;
   eventsDept: string;
   reminderSent: boolean;
   reportSent: boolean;
   participantCount: number;
+  unconfirmedCount: number;
+  requireConfirmation: boolean;
   allPilotsCount: number;
   placeholders: { key: string; label: string }[];
-  defaults: { reminder: EmailFields; notam: EmailFields; report: EmailFields };
-  log: { type: string; subject: string; recipients: number; sent: number; failed: number; createdAt: string }[];
+  defaults: { reminder: EmailFields; notam: EmailFields; confirmReminder: EmailFields; report: EmailFields };
+  log: EmailLogEntry[];
 }
 
 export interface EmailResult {

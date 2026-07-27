@@ -23,19 +23,42 @@ export function eventState(event) {
   const hasStarted = start ? start.getTime() <= now : false;
   const hasEnded = end ? end.getTime() <= now : false;
   const allowAfterStart = Boolean(event.allowBookingAfterStart);
+  // Confirmation is the master switch: when off, bookings are instant (no Awaiting
+  // step) and there is nothing to confirm.
+  const requireConfirmation = event.requireConfirmation == null ? true : Boolean(Number(event.requireConfirmation));
 
+  const HOUR = 3_600_000;
+  // When the confirm window OPENS: this many hours before start (admin-tunable,
+  // per event). Falls back to the global default (7 days) if unset.
+  const opensHours = Number(event.confirmOpensHoursBefore || config.rules.confirmMaxDaysBefore * 24);
+  const confirmOpensAt = requireConfirmation && start ? new Date(start.getTime() - opensHours * HOUR) : null;
+
+  // The claim deadline: after (start - N hours) a still-unconfirmed slot may be
+  // CLAIMED by another pilot. It is NOT freed and the holder can still confirm it.
+  const deadlineHours = Number(event.confirmDeadlineHours || 0);
+  const confirmDeadline =
+    requireConfirmation && deadlineHours > 0 && start ? new Date(start.getTime() - deadlineHours * HOUR) : null;
+  const pastConfirmDeadline = confirmDeadline ? now > confirmDeadline.getTime() : false;
+
+  // The holder may confirm from when the window opens right up to the event (or,
+  // if booking-after-start is allowed, until it ends). Passing the claim deadline
+  // does NOT stop the holder confirming to secure their slot.
   let canConfirmSlots;
-  if (hasEnded) canConfirmSlots = false;
+  if (!requireConfirmation) canConfirmSlots = false;
+  else if (hasEnded) canConfirmSlots = false;
   else if (hasStarted && allowAfterStart) canConfirmSlots = true;
   else if (hasStarted) canConfirmSlots = false;
-  else canConfirmSlots = daysUntil(start) <= config.rules.confirmMaxDaysBefore;
+  else canConfirmSlots = confirmOpensAt ? now >= confirmOpensAt.getTime() : true;
 
-  let canAutoBook = false;
-  if (canConfirmSlots && start) {
-    canAutoBook = daysUntil(start) <= config.rules.autoBookWithinDays;
-  }
-
-  return { hasStarted, hasEnded, canConfirmSlots, canAutoBook };
+  return {
+    hasStarted,
+    hasEnded,
+    requireConfirmation,
+    canConfirmSlots,
+    pastConfirmDeadline,
+    confirmOpensAt: confirmOpensAt ? confirmOpensAt.toISOString() : null,
+    confirmDeadline: confirmDeadline ? confirmDeadline.toISOString() : null,
+  };
 }
 
 /** Attaches derived flags to an event object for API responses. */
