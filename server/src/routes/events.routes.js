@@ -128,7 +128,7 @@ router.get(
 );
 
 // Single event.
-// IVAO event catalogue for this division (admin only) — used to prefill the create form.
+// IVAO event catalogue for this division (admin only) - used to prefill the create form.
 router.get(
   '/ivao/import',
   requireAuth,

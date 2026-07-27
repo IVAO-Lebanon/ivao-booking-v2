@@ -7,7 +7,7 @@ import { audit } from '../utils/audit.js';
 
 const router = Router();
 
-// List all simulators (public — used by the scenery form).
+// List all simulators (public - used by the scenery form).
 router.get(
   '/',
   asyncHandler(async (_req, res) => {

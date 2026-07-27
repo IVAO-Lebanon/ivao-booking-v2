@@ -1,5 +1,5 @@
 // Division-agnostic branding helpers. The division comes from the server (env),
-// never hardcoded — so the app works for any IVAO division.
+// never hardcoded - so the app works for any IVAO division.
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
@@ -10,7 +10,7 @@ export const APP_TAGLINE = 'Flight Booking System';
 /** Operating division, spelled out (used in taglines/footers). */
 export const APP_OPERATOR = 'IVAO Lebanon';
 
-/** BYBLOS app icon (white cedar on brand navy) as an inline SVG data URI — used
+/** BYBLOS app icon (white cedar on brand navy) as an inline SVG data URI - used
  * for the browser favicon. Matches the "icon only" rendition of the Final 2A logo. */
 export function faviconDataUri(): string {
   const svg =

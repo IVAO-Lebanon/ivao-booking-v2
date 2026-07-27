@@ -204,7 +204,7 @@ export function SlotList({
       <div className="flex flex-wrap items-center justify-end gap-1.5">
         {!manageMode && isOwner && slot.claimable && (
           <span className="inline-flex items-center gap-1 rounded-md bg-warning-100 px-2 py-1 text-[11px] font-semibold text-warning-700 dark:bg-warning-900/30 dark:text-warning-300">
-            <AlertTriangle size={12} /> Confirm now — at risk
+            <AlertTriangle size={12} /> Confirm now - at risk
           </span>
         )}
         {!manageMode && (canBook || canClaim) && (

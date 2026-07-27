@@ -1,5 +1,5 @@
 // Public IVAO Whazzup feed (live network snapshot). No auth, but IVAO bans IPs
-// that poll faster than once per 15s — so we fetch at most once per 15s and cache,
+// that poll faster than once per 15s - so we fetch at most once per 15s and cache,
 // serving all clients from that single snapshot. On error we serve the last good copy.
 const WHAZZUP_URL = 'https://api.ivao.aero/v2/tracker/whazzup';
 const TTL = 15_000;

@@ -56,7 +56,7 @@ export default function EventDetailPage() {
     enabled: !!event,
   });
 
-  // Live network overlay — only while the event is actually in progress; refreshes on the Whazzup cadence.
+  // Live network overlay - only while the event is actually in progress; refreshes on the Whazzup cadence.
   const liveQ = useQuery({
     queryKey: ['event-live', eventId],
     queryFn: () => api.eventLive(eventId),
@@ -79,7 +79,7 @@ export default function EventDetailPage() {
         <ArrowLeft size={15} /> All events
       </Link>
 
-      {/* Hero — the banner sizes to the real image (no crop), capped at a max height. */}
+      {/* Hero - the banner sizes to the real image (no crop), capped at a max height. */}
       <div className="card overflow-hidden">
         <div className="relative w-full bg-fuselage-950">
           {event.banner ? (

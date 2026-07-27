@@ -70,7 +70,7 @@ export async function getAirport(icao) {
   return data;
 }
 
-// Weather can legitimately be missing (404) — treated as null, not an error.
+// Weather can legitimately be missing (404) - treated as null, not an error.
 export async function getMetar(icao) {
   const cached = metarCache.get(icao);
   if (cached) return cached.data;
@@ -107,7 +107,7 @@ export async function getAircraft(icao) {
 }
 
 // Full reference catalogues, fetched from IVAO and cached in memory (24h). We do
-// NOT persist these in our own DB — the IVAO API is the source of truth; this is
+// NOT persist these in our own DB - the IVAO API is the source of truth; this is
 // just a transient cache so typeahead searches don't refetch the whole list.
 const catalogueCache = makeCache();
 async function getCatalogue(kind, path) {

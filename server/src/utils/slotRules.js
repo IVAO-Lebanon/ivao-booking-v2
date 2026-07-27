@@ -56,7 +56,7 @@ const rfoRule = {
   },
 };
 
-// Default rule for non-ops events — no special type filtering.
+// Default rule for non-ops events - no special type filtering.
 const defaultRule = {
   async buildTypeFilter() {
     return { sql: '', params: {} };

@@ -7,7 +7,7 @@ import { ArrowRight } from 'lucide-react';
 import { PageLoader, EmptyState, StatusBadge, Pagination, SplitFlap } from '../components/ui';
 import { fmtDateUtc, fmtTimeUtc, relativeToNow } from '../lib/format';
 
-/** Live Zulu time rendered on split-flap board tiles — the signature aviation motif. */
+/** Live Zulu time rendered on split-flap board tiles - the signature aviation motif. */
 function HeroClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "IVAO Lebanon Booking System — Node/Express + MySQL API",
+  "description": "IVAO Lebanon Booking System - Node/Express + MySQL API",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

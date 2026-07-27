@@ -125,7 +125,7 @@ export function describeError(err: unknown): string {
     const parts: string[] = [];
     const fieldErrors: Record<string, string[]> = data.details.fieldErrors || {};
     for (const [field, msgs] of Object.entries(fieldErrors)) {
-      if (msgs?.[0]) parts.push(`${field} — ${msgs[0]}`);
+      if (msgs?.[0]) parts.push(`${field} - ${msgs[0]}`);
     }
     for (const m of (data.details.formErrors as string[]) || []) parts.push(m);
     if (parts.length) return `Please fix: ${parts.join('; ')}.`;

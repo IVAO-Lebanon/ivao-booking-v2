@@ -200,7 +200,7 @@ router.get(
 );
 
 // Rejects any non-empty airport code that isn't a real IVAO airport (an empty
-// origin/destination is allowed — that's an open/private slot). No-ops if the IVAO
+// origin/destination is allowed - that's an open/private slot). No-ops if the IVAO
 // catalogue is unavailable, so we never block on a check we can't perform.
 async function assertAirportsExist(...icaos) {
   const bad = await unknownAirports(icaos.filter(Boolean));
@@ -245,7 +245,7 @@ router.post(
   })
 );
 
-/* ─────────────────────────── BULK IMPORT (admin) — fixed ─────────────────────────── */
+/* ─────────────────────────── BULK IMPORT (admin) - fixed ─────────────────────────── */
 router.post(
   '/event/:eventId/slot/many',
   requireAuth,
@@ -400,7 +400,7 @@ router.post(
     const { action, ids, minutes } = bulkSlotSchema.parse(req.body);
     if (action === 'shift' && minutes == null) throw new ApiError(422, 'validation.failed');
 
-    // Bind ids as named params and — critically — scope every statement to this event
+    // Bind ids as named params and - critically - scope every statement to this event
     // so a crafted request can't touch slots belonging to another event.
     const placeholders = ids.map((_, i) => `:id${i}`).join(',');
     const params = Object.fromEntries(ids.map((id, i) => [`id${i}`, id]));

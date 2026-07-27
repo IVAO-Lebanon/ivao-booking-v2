@@ -1,4 +1,4 @@
--- BYBLOS — Flight Booking System (IVAO), MySQL schema
+-- BYBLOS - Flight Booking System (IVAO), MySQL schema
 -- Charset/engine chosen for broad MySQL 8 / MariaDB compatibility.
 
 CREATE TABLE IF NOT EXISTS users (

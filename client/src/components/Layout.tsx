@@ -173,7 +173,7 @@ export default function Layout() {
 
       <footer className="mt-8 border-t border-fuselage-150 py-6 dark:border-fuselage-800">
         <div className="mx-auto max-w-6xl px-4 text-center text-xs text-fuselage-400">
-          {APP_NAME} — {APP_TAGLINE} by {APP_OPERATOR}, built by{' '}
+          {APP_NAME} - {APP_TAGLINE} by {APP_OPERATOR}, built by{' '}
           <a
             href={AUTHOR.url}
             target="_blank"

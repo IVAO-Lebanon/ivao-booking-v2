@@ -7,7 +7,7 @@ export interface ConfirmOptions {
   message?: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Danger styles the confirm button red — for destructive actions. Default true. */
+  /** Danger styles the confirm button red - for destructive actions. Default true. */
   danger?: boolean;
   icon?: ReactNode;
 }

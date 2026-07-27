@@ -11,7 +11,7 @@ export function render(template, ctx = {}) {
   return String(template || '').replace(/{{\s*(\w+)\s*}}/g, (_, k) => escapeHtml(ctx[k] ?? ''));
 }
 
-/** Like render() but for plain text — no HTML escaping. */
+/** Like render() but for plain text - no HTML escaping. */
 export function renderText(template, ctx = {}) {
   return String(template || '').replace(/{{\s*(\w+)\s*}}/g, (_, k) => String(ctx[k] ?? ''));
 }
@@ -47,9 +47,9 @@ const FOOT_BG = '#f7f8fb';
 const MONO = "'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace";
 const SANS = "'Nunito Sans',-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif";
 const HEAD = "'Poppins',-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-// Footer credit — matches the website footer + branding.ts AUTHOR.
+// Footer credit - matches the website footer + branding.ts AUTHOR.
 const AUTHOR = { name: 'Ahmad Dayeh', url: 'https://www.ivao.aero/Member.aspx?Id=588679' };
-// Product/brand name + tagline — mirror the website (client/src/lib/branding.ts).
+// Product/brand name + tagline - mirror the website (client/src/lib/branding.ts).
 const APP_NAME = 'BYBLOS';
 const APP_TAGLINE = 'Flight Booking System';
 const APP_OPERATOR = 'IVAO Lebanon';
@@ -186,7 +186,7 @@ export function buildText(o = {}, ctx = {}) {
   }
   if (o.showEventStrip) lines.push(`EVENT: ${R('{{eventDate}}')} · ${R('{{eventTime}}')} UTC`, '');
   if (o.ctaShow && o.ctaUrl) lines.push(`${R(o.ctaLabel || 'Open')}: ${R(o.ctaUrl)}`, '');
-  lines.push('--', `${APP_NAME} — ${APP_TAGLINE} by ${APP_OPERATOR}`, `Built by ${AUTHOR.name} (${AUTHOR.url})`);
+  lines.push('--', `${APP_NAME} - ${APP_TAGLINE} by ${APP_OPERATOR}`, `Built by ${AUTHOR.name} (${AUTHOR.url})`);
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -201,7 +201,7 @@ export const defaultReminderMessage =
   'This is a reminder that {{eventName}} takes place on {{eventDate}} at {{eventTime}}. Your booked flight is shown below. Please connect on the network a few minutes before your slot. See you there!';
 export const defaultNotamMessage = 'Please review the update below for your booked flight.\n\nWrite your message here.';
 
-// Fully-editable defaults for each email — every one of these fields is exposed
+// Fully-editable defaults for each email - every one of these fields is exposed
 // in the composer so the admin can customise the whole email (no HTML needed).
 export const composerDefaults = {
   reminder: {

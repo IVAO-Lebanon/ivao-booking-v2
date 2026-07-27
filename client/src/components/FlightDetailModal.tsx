@@ -4,7 +4,7 @@ import { Plane, MapPin, CloudSun, Mountain, Route as RouteIcon } from 'lucide-re
 import { api } from '../api/client';
 import type { AirportBrief, EventModel, Slot } from '../api/types';
 import { Modal, Spinner, StatusBadge } from './ui';
-// Leaflet is heavy (~150 kB) and only needed once a flight is opened — load it on demand.
+// Leaflet is heavy (~150 kB) and only needed once a flight is opened - load it on demand.
 const RouteMapLeaflet = lazy(() => import('./RouteMapLeaflet').then((m) => ({ default: m.RouteMapLeaflet })));
 import { AirlineLogo } from './AirlineLogo';
 import { textureImageUrl, airlineCode } from '../lib/branding';
@@ -107,7 +107,7 @@ export function FlightDetailModal({ slot, event, onClose }: { slot: Slot; event?
         .join(' ') || null
     : null;
 
-  // IVAO-published routes — only when the event opted in and both airports are known.
+  // IVAO-published routes - only when the event opted in and both airports are known.
   const wantRoutes = !!event?.useIvaoRoutes && !!slot.origin && !!slot.destination;
   const routeQ = useQuery({
     queryKey: ['ivao-route', slot.origin, slot.destination],

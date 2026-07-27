@@ -1,6 +1,6 @@
 /**
  * UTC date + time input. Renders a native date picker plus a free-text 24-hour
- * HH:MM field (XX:XX) — NOT a native <input type="time">/datetime-local, which most
+ * HH:MM field (XX:XX) - NOT a native <input type="time">/datetime-local, which most
  * browsers render as a locale 12h AM/PM picker. Value is "YYYY-MM-DDTHH:mm" (UTC),
  * matching the rest of the app's slot/event time handling.
  */

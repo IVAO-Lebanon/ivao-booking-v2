@@ -15,7 +15,7 @@ function pickLivery(textures) {
   return pool[0] || null;
 }
 
-// Aircraft typeahead — served live from the IVAO aircraft catalogue (cached in memory).
+// Aircraft typeahead - served live from the IVAO aircraft catalogue (cached in memory).
 router.get(
   '/aircraft',
   asyncHandler(async (req, res) => {
@@ -29,7 +29,7 @@ router.get(
   })
 );
 
-// Single aircraft type (for the flight detail view) — from the IVAO catalogue.
+// Single aircraft type (for the flight detail view) - from the IVAO catalogue.
 router.get(
   '/aircraft/:icao',
   asyncHandler(async (req, res) => {

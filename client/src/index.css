@@ -63,7 +63,7 @@ body,
   .label {
     @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-fuselage-500 dark:text-fuselage-400;
   }
-  /* Eyebrow: mono, wide-tracked section kicker — reads like a data field label. */
+  /* Eyebrow: mono, wide-tracked section kicker - reads like a data field label. */
   .eyebrow {
     @apply font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-atmos-600 dark:text-atmos-400;
   }

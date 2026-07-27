@@ -26,7 +26,7 @@ export async function requireAuth(req, _res, next) {
   }
 }
 
-/** Optional auth — attaches req.user if a valid token is present, otherwise continues. */
+/** Optional auth - attaches req.user if a valid token is present, otherwise continues. */
 export async function optionalAuth(req, _res, next) {
   const header = req.headers.authorization || '';
   const [scheme, token] = header.split(' ');
@@ -36,7 +36,7 @@ export async function optionalAuth(req, _res, next) {
       const user = await queryOne('SELECT * FROM users WHERE id = :id', { id: payload.id });
       if (user) req.user = normalizeUser(user);
     } catch {
-      /* ignore — treated as anonymous */
+      /* ignore - treated as anonymous */
     }
   }
   next();

@@ -17,7 +17,7 @@ function shape(row) {
   };
 }
 
-// List all event types (public — needed to render event forms and labels).
+// List all event types (public - needed to render event forms and labels).
 router.get(
   '/',
   asyncHandler(async (_req, res) => {
@@ -46,7 +46,7 @@ router.post(
   })
 );
 
-// Update (admin) — code is immutable.
+// Update (admin) - code is immutable.
 router.put(
   '/:code',
   requireAuth,

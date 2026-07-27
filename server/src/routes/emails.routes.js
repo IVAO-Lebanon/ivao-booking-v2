@@ -288,7 +288,7 @@ router.post(
   ...adminOnly,
   asyncHandler(async (req, res) => {
     const event = await getEventOr404(req.params.eventId);
-    // Reminders go to pilots who actually booked — personalised with their flight.
+    // Reminders go to pilots who actually booked - personalised with their flight.
     const participants = await loadParticipants(event.id);
     if (!participants.length) throw new ApiError(422, 'email.noRecipients');
     const opts = { ...composerDefaults.reminder, ...(req.body || {}) };
@@ -384,7 +384,7 @@ router.get(
   ...adminOnly,
   asyncHandler(async (req, res) => {
     const event = await getEventOr404(req.params.eventId);
-    // Note: email addresses are intentionally NOT returned — only name + VID.
+    // Note: email addresses are intentionally NOT returned - only name + VID.
     const rows = await query(
       `SELECT r.vid, r.name, r.ok, r.error, r.createdAt
          FROM event_email_recipients r JOIN event_emails e ON e.id = r.emailId

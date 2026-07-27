@@ -229,7 +229,7 @@ export function AdminSlotPanel({ event }: { event: EventModel }) {
       toast.success(`Imported ${r.imported} slots.`);
     },
     onError: (e) => {
-      // A validation failure carries the full list of problems — show them so the
+      // A validation failure carries the full list of problems - show them so the
       // admin can fix every one, rather than a single vague toast.
       const details = apiErrorDetails<{ issues?: { row: number; field: string; message: string }[]; total?: number }>(e);
       if (details?.issues?.length) setCsvIssues({ issues: details.issues, total: details.total ?? details.issues.length });
@@ -286,7 +286,7 @@ export function AdminSlotPanel({ event }: { event: EventModel }) {
         />
       )}
       {csvIssues && (
-        <Modal open onClose={() => setCsvIssues(null)} title="CSV not imported — fix these first" maxWidth="max-w-2xl">
+        <Modal open onClose={() => setCsvIssues(null)} title="CSV not imported - fix these first" maxWidth="max-w-2xl">
           <div className="space-y-3">
             <div className="flex items-start gap-2 rounded-lg border border-danger-300 bg-danger-50 px-3 py-2 text-sm text-danger-700 dark:border-danger-900/50 dark:bg-danger-900/20 dark:text-danger-300">
               <TriangleAlert size={15} className="mt-0.5 shrink-0" />

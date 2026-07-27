@@ -72,7 +72,7 @@ export function RouteMapLeaflet({ dep, arr, liveryUrl }: { dep: Pt; arr: Pt; liv
       const HW = 56, HH = 38; // half the plane image size (112 x 76)
       plane = document.createElement('img');
       plane.src = liveryUrl;
-      // NOTE: no CSS `filter` (drop-shadow) — a filtered layer gets snapped to whole
+      // NOTE: no CSS `filter` (drop-shadow) - a filtered layer gets snapped to whole
       // device pixels, which shows as vibration when the plane creeps sub-pixel per
       // frame (i.e. when zoomed out). Plain transforms stay sub-pixel smooth.
       Object.assign(plane.style, {
@@ -92,7 +92,7 @@ export function RouteMapLeaflet({ dep, arr, liveryUrl }: { dep: Pt; arr: Pt; liv
 
       // The aircraft flies a single CONTINUOUS quadratic Bézier (3 screen anchors),
       // NOT the 256 discrete arc samples. A smooth parametric curve with an analytic
-      // tangent has no per-point stepping, so it stays smooth at any zoom — including
+      // tangent has no per-point stepping, so it stays smooth at any zoom - including
       // zoomed way out where the plane creeps only a fraction of a pixel per frame.
       // The control point is placed so the curve passes through the real mid-arc point,
       // giving it the same bow as the drawn great-circle line.

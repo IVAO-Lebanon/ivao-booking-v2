@@ -40,7 +40,7 @@ function participantCtx(event, p) {
 
 // Records that the reminder for this event has been sent. The UNIQUE
 // (eventId, type, onceKey) index makes this the single source of truth for
-// "already done" — written only AFTER the emails go out, so a crash mid-send
+// "already done" - written only AFTER the emails go out, so a crash mid-send
 // leaves no row and the next boot retries (at-least-once; a crash can at worst
 // re-notify, never silently skip). Returns false if a row already existed.
 async function recordDone(event, result) {

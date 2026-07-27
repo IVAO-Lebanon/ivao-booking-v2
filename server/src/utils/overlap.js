@@ -1,4 +1,4 @@
-// Real slot-overlap detection (the original always returned false — this is the fix).
+// Real slot-overlap detection (the original always returned false - this is the fix).
 //
 // A pilot cannot be in two places at once. We treat each booked slot as a time
 // window [slotTime, slotTime + estimatedBlockMinutes]. Two windows overlap when

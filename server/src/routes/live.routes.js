@@ -22,7 +22,7 @@ router.get(
     try {
       wz = await getWhazzup();
     } catch {
-      /* network hiccup — degrade gracefully */
+      /* network hiccup - degrade gracefully */
     }
 
     const connections =

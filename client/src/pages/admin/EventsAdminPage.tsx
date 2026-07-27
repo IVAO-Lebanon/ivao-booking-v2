@@ -55,7 +55,7 @@ const OPENS_PRESETS = [
   { value: '12', label: '12 hours before start' },
 ];
 const CLAIM_PRESETS = [
-  { value: '0', label: 'Never — always the pilot’s slot' },
+  { value: '0', label: 'Never - always the pilot’s slot' },
   { value: '72', label: '3 days before start' },
   { value: '48', label: '2 days before start' },
   { value: '24', label: '1 day before start' },
@@ -172,7 +172,7 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
   const setDay = (k: 'dateStart' | 'dateEnd') => (day: string) => setF((s) => ({ ...s, [k]: `${day}T${timePart(s[k]) || '00:00'}` }));
   const setTime = (k: 'dateStart' | 'dateEnd') => (tm: string) => setF((s) => ({ ...s, [k]: `${dayPart(s[k])}T${tm}` }));
 
-  // Inline validation — every field is checked against its expected shape so no
+  // Inline validation - every field is checked against its expected shape so no
   // stray/random values reach the server; the first problem is shown in the modal.
   const [error, setError] = useState('');
   const [showTiming, setShowTiming] = useState(false);

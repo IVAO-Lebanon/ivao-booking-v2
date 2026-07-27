@@ -14,7 +14,7 @@ export function FormError({ message }: { message?: string }) {
 }
 
 /**
- * IVAO globe mark — a simplified rendition of the IVAO brand logo
+ * IVAO globe mark - a simplified rendition of the IVAO brand logo
  * (globe with meridians + an orbiting flight path). See https://brand.ivao.aero/logo/.
  */
 export function IvaoMark({ className = '' }: { className?: string }) {
@@ -148,7 +148,7 @@ export function Pagination({
 }
 
 /**
- * Split-flap display — renders a short string (e.g. a Zulu time or ICAO code)
+ * Split-flap display - renders a short string (e.g. a Zulu time or ICAO code)
  * as individual airport-board tiles. The signature aviation motif of the app.
  */
 export function SplitFlap({

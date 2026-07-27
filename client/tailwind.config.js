@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
-// IVAO brand tokens — sourced from the Atmosphere design system (brand/src/colors.ts, fonts.ts)
+// IVAO brand tokens - sourced from the Atmosphere design system (brand/src/colors.ts, fonts.ts)
 // https://brand.ivao.aero · https://github.com/ivaoaero/atmosphere
 export default {
   darkMode: 'class',

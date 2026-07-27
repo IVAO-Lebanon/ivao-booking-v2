@@ -30,7 +30,7 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
   const set = <K extends keyof EmailFields>(k: K, v: EmailFields[K]) => setF((p) => ({ ...p, [k]: v }));
   const [preview, setPreview] = useState('');
 
-  // Live preview — re-render (debounced) whenever any field changes.
+  // Live preview - re-render (debounced) whenever any field changes.
   useEffect(() => {
     const t = setTimeout(() => {
       api.emailPreview(event.id, { type: mode, ...f }).then((r) => setPreview(r.html)).catch(() => {});
@@ -105,7 +105,7 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
         </p>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {/* Editor — everything is editable */}
+          {/* Editor - everything is editable */}
           <div className="max-h-[460px] space-y-3 overflow-y-auto scroll-thin pr-1">
             {field('subject', 'Subject', '{{eventName}}')}
 
@@ -252,7 +252,7 @@ function LogRow({ eventId, entry }: { eventId: number; entry: EmailLogEntry }) {
                   )}
                   <span className="text-fuselage-700 dark:text-fuselage-200">{abbrevName(r.name) || `VID ${r.vid}`}</span>
                   {r.vid && <span className="font-mono text-fuselage-400">{r.vid}</span>}
-                  {!r.ok && r.error && <span className="text-danger-500">— {r.error}</span>}
+                  {!r.ok && r.error && <span className="text-danger-500">- {r.error}</span>}
                 </li>
               ))}
             </ul>

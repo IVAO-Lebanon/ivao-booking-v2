@@ -1,4 +1,4 @@
-// BYBLOS brand mark — the tiered Lebanese cedar (Final 2A from the design project).
+// BYBLOS brand mark - the tiered Lebanese cedar (Final 2A from the design project).
 // Uses `currentColor` so the caller sets the colour via a text-* class:
 //   green on light (#007A3D), brighter green on dark (#1FCE7A), or white on the
 //   brand-blue icon/favicon.

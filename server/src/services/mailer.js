@@ -1,5 +1,5 @@
 // Email transport. Uses real SMTP when configured (env SMTP_*), otherwise a
-// dev "json" transport that doesn't actually send but resolves successfully — so
+// dev "json" transport that doesn't actually send but resolves successfully - so
 // the whole pipeline (recipients, templates, success/failure reporting) is
 // exercisable locally. Batches are sent with a small concurrency limit.
 import nodemailer from 'nodemailer';
