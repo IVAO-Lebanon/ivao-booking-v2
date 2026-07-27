@@ -41,8 +41,6 @@ const EMPTY = {
   requireConfirmation: true,
   confirmOpensHoursBefore: 168,
   confirmDeadlineHours: 0,
-  confirmReminderHoursBefore: 0,
-  confirmReminderAt: '',
 };
 
 // Friendly presets so admins never have to think in raw "hours before start".
@@ -62,13 +60,6 @@ const CLAIM_PRESETS = [
   { value: '24', label: '1 day before start' },
   { value: '12', label: '12 hours before start' },
   { value: '6', label: '6 hours before start' },
-];
-const REMIND_PRESETS = [
-  { value: '0', label: 'Don’t send a reminder' },
-  { value: '72', label: '3 days before start' },
-  { value: '48', label: '2 days before start' },
-  { value: '24', label: '1 day before start' },
-  { value: '12', label: '12 hours before start' },
 ];
 // Include the current value as a "custom" option if it isn't one of the presets.
 const withCurrent = (items: { value: string; label: string }[], value: string | number) => {
@@ -126,8 +117,6 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
           requireConfirmation: editing.requireConfirmation == null ? true : Boolean(editing.requireConfirmation),
           confirmOpensHoursBefore: editing.confirmOpensHoursBefore ?? 168,
           confirmDeadlineHours: editing.confirmDeadlineHours ?? 0,
-          confirmReminderHoursBefore: editing.confirmReminderHoursBefore ?? 0,
-          confirmReminderAt: editing.confirmReminderAt ? toLocalInput(editing.confirmReminderAt) : '',
         }
       : { ...EMPTY }
   );
@@ -153,8 +142,6 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
         maxBookingsPerPilot: intOr(f.maxBookingsPerPilot, 0),
         confirmOpensHoursBefore: intOr(f.confirmOpensHoursBefore, 168),
         confirmDeadlineHours: intOr(f.confirmDeadlineHours, 0),
-        confirmReminderHoursBefore: intOr(f.confirmReminderHoursBefore, 0),
-        confirmReminderAt: f.requireConfirmation && f.confirmReminderAt ? toUnix(f.confirmReminderAt) : null,
       };
       return editing ? api.updateEvent(editing.id, payload, reconcile) : api.createEvent(payload);
     },
@@ -225,11 +212,6 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
       if (!Number.isInteger(opens) || opens < 1 || opens > 8760) return 'Confirmation opening must be a whole number of hours from 1 to 8760.';
       const hrs = Number(f.confirmDeadlineHours);
       if (!Number.isInteger(hrs) || hrs < 0 || hrs > 720) return 'The claim window must be a whole number of hours from 0 to 720 (0 = never claimable).';
-      const rem = Number(f.confirmReminderHoursBefore);
-      if (!Number.isInteger(rem) || rem < 0 || rem > 8760) return 'The reminder time must be a whole number of hours from 0 to 8760 (0 = off).';
-      if (f.confirmReminderAt && (!/^\d{4}-\d{2}-\d{2}$/.test(dayPart(f.confirmReminderAt)) || !isTime(timePart(f.confirmReminderAt)))) return 'The reminder date/time must be a valid date and time (HH:MM, 24h UTC), or leave it blank.';
-      // A specific reminder time after the event has already started would never fire.
-      if (f.confirmReminderAt && isTime(timePart(f.confirmReminderAt)) && toUnix(f.confirmReminderAt) >= toUnix(f.dateStart)) return 'The reminder time must be before the event start.';
     }
     return '';
   };
@@ -430,8 +412,6 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
                   opens {labelOf(OPENS_PRESETS, f.confirmOpensHoursBefore).toLowerCase()}
                   {' · '}
                   {Number(f.confirmDeadlineHours) ? `claimable ${labelOf(CLAIM_PRESETS, f.confirmDeadlineHours).toLowerCase()}` : 'never claimable'}
-                  {' · '}
-                  {Number(f.confirmReminderHoursBefore) || f.confirmReminderAt ? 'reminder on' : 'no reminder'}
                 </span>
               )}
             </button>
@@ -447,32 +427,9 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
                     <Select position="popper" value={String(f.confirmDeadlineHours)} onValueChange={setVal('confirmDeadlineHours')} items={withCurrent(CLAIM_PRESETS, f.confirmDeadlineHours)} />
                   </div>
                 </div>
-                <div>
-                  <label className="label">Auto-remind pilots who haven’t confirmed</label>
-                  <Select position="popper" value={String(f.confirmReminderHoursBefore)} onValueChange={setVal('confirmReminderHoursBefore')} items={withCurrent(REMIND_PRESETS, f.confirmReminderHoursBefore)} />
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-xs text-fuselage-500 dark:text-fuselage-400">…or send it at an exact date &amp; time (UTC)</summary>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <input
-                        type="date"
-                        className="input max-w-[12rem]"
-                        value={dayPart(f.confirmReminderAt)}
-                        onChange={(e) => setF((s) => ({ ...s, confirmReminderAt: e.target.value ? `${e.target.value}T${timePart(s.confirmReminderAt) || '00:00'}` : '' }))}
-                      />
-                      <input
-                        type="text"
-                        placeholder="HH:MM"
-                        className="input max-w-[7rem] text-center font-mono"
-                        value={timePart(f.confirmReminderAt)}
-                        onChange={(e) => setF((s) => ({ ...s, confirmReminderAt: `${dayPart(s.confirmReminderAt) || dayPart(s.dateStart)}T${e.target.value}` }))}
-                      />
-                      {f.confirmReminderAt && (
-                        <button type="button" className="btn-ghost px-2 py-1 text-xs" onClick={() => setF((s) => ({ ...s, confirmReminderAt: '' }))}>Clear</button>
-                      )}
-                      <span className="text-xs text-fuselage-400">overrides the option above</span>
-                    </div>
-                  </details>
-                </div>
+                <p className="text-xs text-fuselage-400">
+                  To remind pilots to confirm, open this event's Email page and send a Confirm reminder whenever you like.
+                </p>
               </div>
             )}
           </div>

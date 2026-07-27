@@ -92,7 +92,7 @@ const truthy = (v) => Boolean(Number(v));
 // Works out what editing an event would do to its EXISTING bookings, so the admin
 // can be warned before saving. `deltaMinutes` is how far the event start moves.
 async function computeSideEffects(existing, data, deltaMinutes) {
-  const summary = { confirmPending: 0, dateShift: null, overLimit: 0, reminderRearm: false };
+  const summary = { confirmPending: 0, dateShift: null, overLimit: 0 };
 
   // Turning confirmation off: any still-provisional bookings become confirmed.
   if (truthy(existing.requireConfirmation) && !data.requireConfirmation) {
@@ -116,12 +116,6 @@ async function computeSideEffects(existing, data, deltaMinutes) {
     );
     summary.overLimit = rows.length;
   }
-
-  // Reminder rescheduled: re-arm so it can fire again even if already sent.
-  const remChanged =
-    Number(existing.confirmReminderHoursBefore || 0) !== Number(data.confirmReminderHoursBefore || 0) ||
-    mysqlToUnix(existing.confirmReminderAt) !== (data.confirmReminderAt || null);
-  summary.reminderRearm = Boolean(data.requireConfirmation) && remChanged;
 
   return summary;
 }
@@ -215,9 +209,9 @@ router.post(
     const event = await transaction(async (tx) => {
       const result = await tx.query(
         `INSERT INTO events
-          (division, eventName, description, type, status, dateStart, dateEnd, banner, atcBooking, atcBriefing, pilotBriefing, publicAccess, allowBookingAfterStart, maxBookingsPerPilot, bookingMessage, useIvaoRoutes, requireConfirmation, confirmOpensHoursBefore, confirmDeadlineHours, confirmReminderHoursBefore, confirmReminderAt, createdBy)
+          (division, eventName, description, type, status, dateStart, dateEnd, banner, atcBooking, atcBriefing, pilotBriefing, publicAccess, allowBookingAfterStart, maxBookingsPerPilot, bookingMessage, useIvaoRoutes, requireConfirmation, confirmOpensHoursBefore, confirmDeadlineHours, createdBy)
          VALUES
-          (:division,:eventName,:description,:type,:status,:dateStart,:dateEnd,:banner,:atcBooking,:atcBriefing,:pilotBriefing,:publicAccess,:allowBookingAfterStart,:maxBookingsPerPilot,:bookingMessage,:useIvaoRoutes,:requireConfirmation,:confirmOpensHoursBefore,:confirmDeadlineHours,:confirmReminderHoursBefore,:confirmReminderAt,:createdBy)`,
+          (:division,:eventName,:description,:type,:status,:dateStart,:dateEnd,:banner,:atcBooking,:atcBriefing,:pilotBriefing,:publicAccess,:allowBookingAfterStart,:maxBookingsPerPilot,:bookingMessage,:useIvaoRoutes,:requireConfirmation,:confirmOpensHoursBefore,:confirmDeadlineHours,:createdBy)`,
         {
           division: req.user.division || config.division,
           eventName: data.eventName,
@@ -238,8 +232,6 @@ router.post(
           requireConfirmation: data.requireConfirmation ? 1 : 0,
           confirmOpensHoursBefore: data.confirmOpensHoursBefore,
           confirmDeadlineHours: data.confirmDeadlineHours,
-          confirmReminderHoursBefore: data.confirmReminderHoursBefore,
-          confirmReminderAt: data.confirmReminderAt ? tsToMysql(data.confirmReminderAt) : null,
           createdBy: req.user.id,
         }
       );
@@ -289,8 +281,7 @@ router.put(
           allowBookingAfterStart=:allowBookingAfterStart, maxBookingsPerPilot=:maxBookingsPerPilot,
           bookingMessage=:bookingMessage, useIvaoRoutes=:useIvaoRoutes,
           requireConfirmation=:requireConfirmation, confirmOpensHoursBefore=:confirmOpensHoursBefore,
-          confirmDeadlineHours=:confirmDeadlineHours, confirmReminderHoursBefore=:confirmReminderHoursBefore,
-          confirmReminderAt=:confirmReminderAt
+          confirmDeadlineHours=:confirmDeadlineHours
          WHERE id=:id`,
         {
           id: existing.id,
@@ -312,8 +303,6 @@ router.put(
           requireConfirmation: data.requireConfirmation ? 1 : 0,
           confirmOpensHoursBefore: data.confirmOpensHoursBefore,
           confirmDeadlineHours: data.confirmDeadlineHours,
-          confirmReminderHoursBefore: data.confirmReminderHoursBefore,
-          confirmReminderAt: data.confirmReminderAt ? tsToMysql(data.confirmReminderAt) : null,
         }
       );
       await replaceAirports(tx, existing.id, data.airports);
@@ -338,11 +327,6 @@ router.put(
           { e: existing.id, m: effects.dateShift.deltaMinutes }
         );
         slotsShifted = r?.affectedRows || 0;
-      }
-
-      // Reminder rescheduled: clear the auto-send record so it can fire again.
-      if (effects.reminderRearm) {
-        await tx.query("DELETE FROM event_emails WHERE eventId=:e AND type='confirm-reminder'", { e: existing.id });
       }
 
       return { confirmedPending, slotsShifted };

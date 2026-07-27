@@ -43,8 +43,6 @@ export function ReconcileDialog({
     items.push(
       `${summary.overLimit} pilot(s) already hold more bookings than the new limit; they keep them and the limit applies to new bookings only.`
     );
-  if (summary.reminderRearm)
-    items.push('The confirmation reminder will be re-armed so it can send again on the new schedule.');
 
   return (
     <div className="space-y-4">

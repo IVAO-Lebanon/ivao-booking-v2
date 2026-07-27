@@ -84,10 +84,6 @@ export const eventSchema = z.object({
   // Hours before start after which an unconfirmed booking becomes claimable by other
   // pilots (it is NOT freed). 0 = never claimable. (max 720h = 30 days.)
   confirmDeadlineHours: z.coerce.number().int().min(0).max(720).default(0),
-  // Auto confirm-reminder: N hours before start (0 = off), or an explicit UTC time
-  // (unix seconds) which takes precedence.
-  confirmReminderHoursBefore: z.coerce.number().int().min(0).max(8760).default(0),
-  confirmReminderAt: z.coerce.number().int().positive().nullable().optional(),
   airports: z.string().min(4), // comma-separated ICAOs
 });
 

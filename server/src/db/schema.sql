@@ -71,10 +71,6 @@ CREATE TABLE IF NOT EXISTS events (
   -- CLAIMABLE by other pilots (it is NOT freed; the holder keeps it until someone
   -- else claims it, and can still confirm to secure it). 0 = never claimable.
   confirmDeadlineHours  INT          NOT NULL DEFAULT 0,
-  -- Auto confirm-reminder scheduling: send this many hours before start (0 = off),
-  -- or at an explicit UTC time (confirmReminderAt, which takes precedence when set).
-  confirmReminderHoursBefore INT     NOT NULL DEFAULT 0,
-  confirmReminderAt     DATETIME     NULL,
   createdBy             BIGINT UNSIGNED NULL,
   createdAt             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updatedAt             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

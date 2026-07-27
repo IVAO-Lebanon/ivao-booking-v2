@@ -60,8 +60,6 @@ export interface EventModel {
   requireConfirmation: number | boolean;
   confirmOpensHoursBefore: number;
   confirmDeadlineHours: number;
-  confirmReminderHoursBefore: number;
-  confirmReminderAt: string | null;
   airports: string[];
   sceneries: Scenery[];
   hasStarted: boolean;
@@ -80,7 +78,6 @@ export interface ReconcileSummary {
   confirmPending: number;
   dateShift: { deltaMinutes: number; timedSlots: number } | null;
   overLimit: number;
-  reminderRearm: boolean;
 }
 
 /** What an applied event update actually did to existing bookings. */
