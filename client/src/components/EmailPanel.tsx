@@ -1,29 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import { Mail, Megaphone, Bell, Send, TriangleAlert, CalendarClock, Check, X, ChevronDown, ChevronRight, FlaskConical, Users } from 'lucide-react';
+import { Mail, Megaphone, Bell, Send, TriangleAlert, CalendarClock, Ban, Check, X, ChevronDown, ChevronRight, FlaskConical, Users } from 'lucide-react';
 import { Switch, Select } from '@ivao/atmosphere-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../api/client';
-import type { EmailFields, EmailStatus, EmailLogEntry, EventModel } from '../api/types';
+import { api } from '../api/client';
+import type { EmailFields, EmailStatus, EmailLogEntry, EmailType, EventModel } from '../api/types';
 import { Modal, Spinner } from './ui';
-import { EmailApprovals } from './EmailApprovals';
 import { useToast } from './Toast';
-import { friendlyError, describeError, fmtUtc } from '../lib/format';
+import { describeError, fmtUtc } from '../lib/format';
 
-type Mode = 'reminder' | 'notam' | 'confirmReminder';
-
-const MODE_META: Record<Mode, { title: string; audience: (s: EmailStatus) => string; once: boolean }> = {
-  reminder: { title: 'Reminder to pilots who booked', audience: (s) => `${s.participantCount} pilot(s) who booked`, once: true },
-  notam: { title: 'NOTAM to participating pilots', audience: (s) => `${s.participantCount} participant(s)`, once: false },
-  confirmReminder: { title: 'Reminder to confirm booking', audience: (s) => `${s.unconfirmedCount} unconfirmed pilot(s)`, once: false },
+// The four email types. Each is admin-sent, re-sendable, and computed from live
+// bookings when sent. Only the announcement lets the admin choose the audience.
+const MODE_META: Record<EmailType, { label: string; title: string; icon: React.ReactNode; audience: (s: EmailStatus) => string; pickAudience: boolean }> = {
+  reminder: { label: 'Reminder', title: 'Reminder to pilots who booked', icon: <Bell size={14} />, audience: (s) => `${s.participantCount} pilot(s) who booked`, pickAudience: false },
+  confirmReminder: { label: 'Confirm reminder', title: 'Reminder to confirm booking', icon: <CalendarClock size={14} />, audience: (s) => `${s.unconfirmedCount} pilot(s) awaiting confirmation`, pickAudience: false },
+  notam: { label: 'Announcement', title: 'Announcement (NOTAM)', icon: <Megaphone size={14} />, audience: (s) => `${s.participantCount} participant(s)`, pickAudience: true },
+  cancellation: { label: 'Cancellation', title: 'Cancellation notice', icon: <Ban size={14} />, audience: (s) => `${s.participantCount} pilot(s) who booked`, pickAudience: false },
 };
 
-const SEND_FN: Record<Mode, (id: number, body: EmailFields) => Promise<{ sent: number; total: number; failed: number }>> = {
-  reminder: (id, f) => api.sendReminder(id, f),
-  notam: (id, f) => api.sendNotam(id, f),
-  confirmReminder: (id, f) => api.sendConfirmReminder(id, f),
-};
-
-function Composer({ event, mode, status, onClose }: { event: EventModel; mode: Mode; status: EmailStatus; onClose: () => void }) {
+function Composer({ event, mode, status, onClose }: { event: EventModel; mode: EmailType; status: EmailStatus; onClose: () => void }) {
   const toast = useToast();
   const qc = useQueryClient();
   const msgRef = useRef<HTMLTextAreaElement>(null);
@@ -31,7 +25,7 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
   const set = <K extends keyof EmailFields>(k: K, v: EmailFields[K]) => setF((p) => ({ ...p, [k]: v }));
   const [preview, setPreview] = useState('');
 
-  // Live preview - re-render (debounced) whenever any field changes.
+  // Live preview, debounced, re-rendered whenever any field changes.
   useEffect(() => {
     const t = setTimeout(() => {
       api.emailPreview(event.id, { type: mode, ...f }).then((r) => setPreview(r.html)).catch(() => {});
@@ -49,12 +43,14 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
     requestAnimationFrame(() => { el.focus(); el.selectionStart = el.selectionEnd = start + token.length; });
   };
 
-  // NOTAM lets the admin pick who receives it; other types have a fixed audience.
+  // Only the announcement (NOTAM) lets the admin pick who receives it.
   const [audience, setAudience] = useState<'participants' | 'booked' | 'unconfirmed'>('participants');
   const [vid, setVid] = useState('');
+  const meta = MODE_META[mode];
 
   const send = useMutation({
-    mutationFn: () => (mode === 'notam' ? api.sendNotam(event.id, { ...f, audience, vid: vid.trim() || undefined }) : SEND_FN[mode](event.id, f)),
+    mutationFn: () =>
+      api.sendEmail(event.id, meta.pickAudience ? { type: mode, ...f, audience, vid: vid.trim() || undefined } : { type: mode, ...f }),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['email-status', event.id] });
       toast.success(`Sent ${r.sent}/${r.total}${r.failed ? ` · ${r.failed} failed` : ''}.`);
@@ -70,14 +66,13 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
   });
 
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const audienceCount =
-    mode !== 'notam'
-      ? undefined
-      : audience === 'booked'
-        ? Math.max(0, status.participantCount - status.unconfirmedCount)
-        : audience === 'unconfirmed'
-          ? status.unconfirmedCount
-          : status.participantCount;
+  const audienceCount = !meta.pickAudience
+    ? undefined
+    : audience === 'booked'
+      ? Math.max(0, status.participantCount - status.unconfirmedCount)
+      : audience === 'unconfirmed'
+        ? status.unconfirmedCount
+        : status.participantCount;
 
   const field = (k: keyof EmailFields, label: string, placeholder = '') => (
     <div>
@@ -93,7 +88,7 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
   );
 
   return (
-    <Modal open onClose={onClose} title={MODE_META[mode].title} maxWidth="max-w-5xl">
+    <Modal open onClose={onClose} title={meta.title} maxWidth="max-w-5xl">
       <div className="space-y-3">
         {!status.configured && (
           <div className="flex items-center gap-2 rounded-lg border border-warning-300 bg-warning-50 px-3 py-2 text-xs text-warning-800 dark:border-warning-900/50 dark:bg-warning-900/20 dark:text-warning-200">
@@ -101,16 +96,16 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
           </div>
         )}
         <p className="text-xs text-fuselage-500">
-          Recipients: <b>{mode === 'notam' ? `${audienceCount} pilot(s)${vid ? ` · VID ${vid}` : ''}` : MODE_META[mode].audience(status)}</b>
-          {MODE_META[mode].once ? ' · can be sent once' : ' · unlimited'}
+          Recipients: <b>{meta.pickAudience ? `${audienceCount} pilot(s)${vid ? ` · VID ${vid}` : ''}` : meta.audience(status)}</b>
+          {' · '}computed when you send · can be sent again any time
         </p>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {/* Editor - everything is editable */}
+          {/* Editor */}
           <div className="max-h-[460px] space-y-3 overflow-y-auto scroll-thin pr-1">
             {field('subject', 'Subject', '{{eventName}}')}
 
-            {mode === 'notam' && (
+            {meta.pickAudience && (
               <div className="space-y-2 rounded-lg border border-fuselage-200 p-3 dark:border-fuselage-700">
                 <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-fuselage-400">
                   <Users size={13} /> Audience
@@ -195,8 +190,8 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
           <button className="btn-secondary" onClick={() => sendTest.mutate()} disabled={sendTest.isPending} title="Send one copy to your own email">
             {sendTest.isPending ? <Spinner /> : <><FlaskConical size={15} /> Send test to me</>}
           </button>
-          <button className="btn-primary ml-auto" onClick={() => send.mutate()} disabled={send.isPending || (mode === 'notam' && audienceCount === 0)}>
-            {send.isPending ? <Spinner /> : <><Send size={15} /> Send{mode === 'notam' ? ` to ${audienceCount} pilot(s)` : ''}</>}
+          <button className="btn-primary ml-auto" onClick={() => send.mutate()} disabled={send.isPending || (meta.pickAudience && audienceCount === 0)}>
+            {send.isPending ? <Spinner /> : <><Send size={15} /> Send{meta.pickAudience ? ` to ${audienceCount} pilot(s)` : ''}</>}
           </button>
         </div>
       </div>
@@ -204,8 +199,7 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: M
   );
 }
 
-// "Sam Rivera" -> "Sam R." (keep first name, abbreviate the surname). Avoids showing
-// full surnames/emails in the log; VID is shown alongside.
+// "Sam Rivera" -> "Sam R." (keep first name, abbreviate the surname).
 function abbrevName(full: string): string {
   const parts = (full || '').trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '';
@@ -246,11 +240,7 @@ function LogRow({ eventId, entry }: { eventId: number; entry: EmailLogEntry }) {
             <ul className="space-y-0.5">
               {recipients.map((r, i) => (
                 <li key={i} className="flex items-center gap-2 text-[11px]">
-                  {r.ok ? (
-                    <Check size={12} className="shrink-0 text-success-600" />
-                  ) : (
-                    <X size={12} className="shrink-0 text-danger-500" />
-                  )}
+                  {r.ok ? <Check size={12} className="shrink-0 text-success-600" /> : <X size={12} className="shrink-0 text-danger-500" />}
                   <span className="text-fuselage-700 dark:text-fuselage-200">{abbrevName(r.name) || `VID ${r.vid}`}</span>
                   {r.vid && <span className="font-mono text-fuselage-400">{r.vid}</span>}
                   {!r.ok && r.error && <span className="text-danger-500">- {r.error}</span>}
@@ -266,42 +256,40 @@ function LogRow({ eventId, entry }: { eventId: number; entry: EmailLogEntry }) {
 
 export function EmailPanel({ event }: { event: EventModel }) {
   const { data: status, isLoading } = useQuery({ queryKey: ['email-status', event.id], queryFn: () => api.emailStatus(event.id) });
-  const { data: approvals } = useQuery({ queryKey: ['email-approvals', event.id], queryFn: () => api.emailApprovals(event.id) });
-  const [mode, setMode] = useState<Mode | null>(null);
+  const [mode, setMode] = useState<EmailType | null>(null);
 
   if (isLoading || !status) return null;
 
-  const Btn = ({ m, icon, label, disabled }: { m: Mode; icon: React.ReactNode; label: string; disabled?: boolean }) => (
-    <button className="btn-secondary px-3 py-1.5 text-xs" onClick={() => setMode(m)} disabled={disabled} title={disabled ? 'Already sent (one-time)' : ''}>
-      {icon} {label}
+  const Btn = ({ m, disabled, hint }: { m: EmailType; disabled?: boolean; hint?: string }) => (
+    <button className="btn-secondary px-3 py-1.5 text-xs" onClick={() => setMode(m)} disabled={disabled} title={hint || MODE_META[m].title}>
+      {MODE_META[m].icon} {MODE_META[m].label}
     </button>
   );
 
   return (
     <div className="card mb-4 p-3">
-      {approvals && approvals.length > 0 && (
-        <div className="mb-3">
-          <EmailApprovals items={approvals} />
-        </div>
-      )}
+      <div className="mb-2 flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-fuselage-400">
+        <Mail size={13} /> Message pilots
+        {!status.configured && <span className="ml-auto normal-case text-warning-600">SMTP not configured (preview mode)</span>}
+      </div>
+      <p className="mb-2 text-xs text-fuselage-500">
+        Pick what to send. Nothing is ever sent automatically, and every email can be sent again and reflects the current bookings.
+      </p>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 inline-flex items-center gap-1.5 font-mono text-[11px] font-bold uppercase tracking-wider text-fuselage-400">
-          <Mail size={13} /> Email
-        </span>
-        <Btn m="reminder" icon={<Bell size={14} />} label={status.reminderSent ? 'Reminder sent' : 'Send reminder'} disabled={status.reminderSent} />
-        <Btn m="notam" icon={<Megaphone size={14} />} label="Send NOTAM" />
+        <Btn m="reminder" />
         {status.requireConfirmation && (
           <Btn
             m="confirmReminder"
-            icon={<CalendarClock size={14} />}
-            label={`Confirm reminder${status.unconfirmedCount ? ` (${status.unconfirmedCount})` : ''}`}
             disabled={status.unconfirmedCount === 0}
+            hint={status.unconfirmedCount === 0 ? 'No pilots are awaiting confirmation' : `${status.unconfirmedCount} awaiting confirmation`}
           />
         )}
-        {!status.configured && <span className="ml-auto text-[11px] text-warning-600">SMTP not configured (preview mode)</span>}
+        <Btn m="notam" />
+        <Btn m="cancellation" />
       </div>
       {status.log.length > 0 && (
-        <div className="mt-2 space-y-1 border-t border-fuselage-100 pt-2 dark:border-fuselage-800">
+        <div className="mt-3 space-y-1 border-t border-fuselage-100 pt-2 dark:border-fuselage-800">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-fuselage-400">Sent history</div>
           {status.log.slice(0, 8).map((l) => (
             <LogRow key={l.id} eventId={event.id} entry={l} />
           ))}

@@ -79,7 +79,6 @@ export interface EventModel {
 export interface ReconcileSummary {
   confirmPending: number;
   dateShift: { deltaMinutes: number; timedSlots: number } | null;
-  cancelNotify: number;
   overLimit: number;
   reminderRearm: boolean;
 }
@@ -88,19 +87,7 @@ export interface ReconcileSummary {
 export interface EventUpdateApplied {
   confirmedPending: number;
   slotsShifted: number;
-  cancelQueued: number;
   overLimit: number;
-}
-
-/** A system email waiting for admin approval before it can be sent. */
-export interface EmailApproval {
-  id: number;
-  eventId: number;
-  eventName: string;
-  dateStart: string;
-  type: 'confirm-reminder' | 'cancelled';
-  audienceCount: number;
-  createdAt: string;
 }
 
 export interface IvaoEventRoute {
@@ -286,17 +273,15 @@ export interface EmailRecipient {
   createdAt: string;
 }
 
+export type EmailType = 'reminder' | 'confirmReminder' | 'notam' | 'cancellation';
+
 export interface EmailStatus {
   configured: boolean;
-  eventsDept: string;
-  reminderSent: boolean;
-  reportSent: boolean;
   participantCount: number;
   unconfirmedCount: number;
   requireConfirmation: boolean;
-  allPilotsCount: number;
   placeholders: { key: string; label: string }[];
-  defaults: { reminder: EmailFields; notam: EmailFields; confirmReminder: EmailFields; report: EmailFields };
+  defaults: Record<EmailType, EmailFields>;
   log: EmailLogEntry[];
 }
 

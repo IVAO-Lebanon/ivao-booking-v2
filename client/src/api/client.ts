@@ -8,7 +8,6 @@ import type {
   EmailResult,
   EmailStatus,
   EmailRecipient,
-  EmailApproval,
   EventLive,
   IvaoImport,
   EventModel,
@@ -185,30 +184,17 @@ class ApiClient {
   aircraftSearch = (search: string) =>
     this.axios.get<AircraftType[]>('/ref/aircraft', { params: { search } }).then((r) => r.data);
 
-  // ── Event emails ──
+  // ── Event emails (all admin-sent, re-sendable, computed live) ──
   emailStatus = (eventId: number) =>
     this.axios.get<EmailStatus>(`/event/${eventId}/email/status`).then((r) => r.data);
   emailPreview = (eventId: number, body: unknown) =>
     this.axios.post<{ html: string }>(`/event/${eventId}/email/preview`, body).then((r) => r.data);
-  sendReminder = (eventId: number, body: unknown = {}) =>
-    this.axios.post<EmailResult>(`/event/${eventId}/email/reminder`, body).then((r) => r.data);
-  sendReport = (eventId: number, body: unknown) =>
-    this.axios.post<EmailResult>(`/event/${eventId}/email/report`, body).then((r) => r.data);
-  sendNotam = (eventId: number, body: unknown) =>
-    this.axios.post<EmailResult>(`/event/${eventId}/email/notam`, body).then((r) => r.data);
-  sendConfirmReminder = (eventId: number, body: unknown) =>
-    this.axios.post<EmailResult>(`/event/${eventId}/email/confirm-reminder`, body).then((r) => r.data);
+  sendEmail = (eventId: number, body: unknown) =>
+    this.axios.post<EmailResult>(`/event/${eventId}/email/send`, body).then((r) => r.data);
   sendTestEmail = (eventId: number, body: unknown) =>
     this.axios.post<EmailResult & { to: string }>(`/event/${eventId}/email/test`, body).then((r) => r.data);
   emailRecipients = (eventId: number, emailId: number) =>
     this.axios.get<EmailRecipient[]>(`/event/${eventId}/email/${emailId}/recipients`).then((r) => r.data);
-
-  // ── Email approval queue (system emails awaiting an admin click) ──
-  emailApprovals = (eventId?: number) =>
-    this.axios.get<EmailApproval[]>('/email-approval', { params: eventId ? { eventId } : {} }).then((r) => r.data);
-  approveEmail = (id: number) =>
-    this.axios.post<{ sent: number; total: number; failed: number }>(`/email-approval/${id}/approve`).then((r) => r.data);
-  dismissEmail = (id: number) => this.axios.post(`/email-approval/${id}/dismiss`).then(() => {});
 
   // ── Custom data (airports / aircraft) ──
   customAirports = () => this.axios.get<CustomAirport[]>('/custom/airport').then((r) => r.data);

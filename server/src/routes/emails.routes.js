@@ -1,15 +1,12 @@
 import { Router } from 'express';
-import { config } from '../config.js';
 import { query, queryOne } from '../db/pool.js';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { asyncHandler, ApiError } from '../middleware/error.js';
 import { audit } from '../utils/audit.js';
-import { toCsv } from '../utils/csv.js';
 import { sendBulk, isEmailConfigured } from '../services/mailer.js';
 import { composerDefaults, PLACEHOLDERS } from '../services/emailTemplates.js';
 import {
   fmtDate,
-  fmtDateTime,
   eventCtx,
   participantCtx,
   loadParticipants,
@@ -18,6 +15,19 @@ import {
 } from '../services/eventEmails.js';
 
 const router = Router();
+const adminOnly = [requireAuth, requireAdmin];
+
+// The four email types. Each is admin-sent (never automatic), re-sendable any time,
+// and always resolves its recipients + content from CURRENT bookings at send time.
+//   template  -> which composerDefaults / layout to use
+//   audience  -> who it goes to (NOTAM lets the admin choose, so it's null here)
+//   logType   -> event_emails.type value for the history log
+const EMAIL_TYPES = {
+  reminder: { template: 'reminder', audience: 'participants', logType: 'reminder', subject: (e) => `Reminder: ${e.eventName}` },
+  confirmReminder: { template: 'confirmReminder', audience: 'unconfirmed', logType: 'confirm-reminder', subject: (e) => `Confirm reminder: ${e.eventName}` },
+  notam: { template: 'notam', audience: null, logType: 'notam', subject: (e) => `NOTAM: ${e.eventName}` },
+  cancellation: { template: 'cancelled', audience: 'participants', logType: 'cancelled', subject: (e) => `Cancelled: ${e.eventName}` },
+};
 
 async function getEventOr404(id) {
   const e = await queryOne('SELECT * FROM events WHERE id=:id', { id });
@@ -59,55 +69,7 @@ async function sampleCtxFor(event) {
     : { ...eventCtx(event), pilotName: 'Sample Pilot', vid: '000000', callsign: 'ABC123', origin: 'EGLL', destination: 'LFPG', slotTime: `${fmtDate(event.dateStart)} 16:00z`, aircraft: 'A320', gate: 'A1' };
 }
 
-async function loadBookings(eventId) {
-  const rows = await query(
-    `SELECT s.flightNumber, s.origin, s.destination, s.slotTime, s.aircraft, s.bookingStatus, u.vid
-       FROM slots s LEFT JOIN users u ON u.id = s.pilotId
-      WHERE s.eventId=:e AND s.bookingStatus <> 'free' ORDER BY s.slotTime ASC`,
-    { e: eventId }
-  );
-  return rows.map((r) => ({
-    flightNumber: r.flightNumber,
-    origin: r.origin,
-    destination: r.destination,
-    slotTime: fmtDateTime(r.slotTime),
-    aircraft: r.aircraft,
-    status: r.bookingStatus,
-    pilot: r.vid || '',
-  }));
-}
-
-function bookingsCsv(bookings) {
-  return toCsv(
-    ['callsign', 'origin', 'destination', 'slotTime', 'aircraft', 'status', 'pilotVid'],
-    bookings.map((b) => ({
-      callsign: b.flightNumber || '',
-      origin: b.origin || '',
-      destination: b.destination || '',
-      slotTime: b.slotTime || '',
-      aircraft: b.aircraft || '',
-      status: b.status,
-      pilotVid: b.pilot || '',
-    }))
-  );
-}
-
-// ── One-time guard (atomic via the UNIQUE (eventId,type,onceKey) index) ──
-async function claimOnce(eventId, type, subject, userId) {
-  try {
-    const r = await query(
-      `INSERT INTO event_emails (eventId, type, onceKey, subject, sentBy) VALUES (:e,:t,'once',:s,:by)`,
-      { e: eventId, t: type, s: String(subject).slice(0, 250), by: userId }
-    );
-    return r.insertId;
-  } catch (err) {
-    if (err.code === 'ER_DUP_ENTRY' || /Duplicate/i.test(err.message || '')) throw new ApiError(409, 'email.alreadySent');
-    throw err;
-  }
-}
-const finalize = (id, r) => query('UPDATE event_emails SET recipients=:r, sent=:s, failed=:f WHERE id=:id', { id, r: r.total, s: r.sent, f: r.failed });
-const releaseOnce = (id) => query('DELETE FROM event_emails WHERE id=:id', { id });
-// Records an unlimited (multi-send) email of a given type and returns its row id.
+// Records a sent email (multi-send; no one-time lock) and returns its row id.
 async function recordSend(eventId, type, subject, userId, r) {
   const res = await query(
     `INSERT INTO event_emails (eventId, type, onceKey, subject, sentBy, recipients, sent, failed)
@@ -138,11 +100,9 @@ async function recordRecipients(emailId, participants, result) {
     params
   );
 }
-const alreadySent = async (eventId, type) =>
-  Boolean(await queryOne("SELECT id FROM event_emails WHERE eventId=:e AND type=:t AND onceKey='once' LIMIT 1", { e: eventId, t: type }));
 
-const adminOnly = [requireAuth, requireAdmin];
-
+// Live counts + defaults + history for the Email panel. No one-time flags: every
+// email can be sent again and recomputes from current bookings.
 router.get(
   '/event/:eventId/email/status',
   ...adminOnly,
@@ -150,99 +110,71 @@ router.get(
     const event = await getEventOr404(req.params.eventId);
     const participants = await loadParticipants(event.id);
     const unconfirmed = await loadUnconfirmed(event.id);
-    const allPilots = (await query("SELECT COUNT(*) c FROM users WHERE email IS NOT NULL AND email <> ''"))[0].c;
     const log = await query(
       'SELECT id, type, subject, recipients, sent, failed, createdAt FROM event_emails WHERE eventId=:e ORDER BY createdAt DESC',
       { e: event.id }
     );
     res.json({
       configured: isEmailConfigured(),
-      eventsDept: config.email.eventsDept || '',
-      reminderSent: await alreadySent(event.id, 'reminder'),
-      reportSent: await alreadySent(event.id, 'report'),
       participantCount: participants.length,
       unconfirmedCount: unconfirmed.length,
       requireConfirmation: Boolean(Number(event.requireConfirmation)),
-      allPilotsCount: allPilots,
       placeholders: PLACEHOLDERS,
-      defaults: composerDefaults,
+      defaults: {
+        reminder: composerDefaults.reminder,
+        confirmReminder: composerDefaults.confirmReminder,
+        notam: composerDefaults.notam,
+        cancellation: composerDefaults.cancelled,
+      },
       log,
     });
   })
 );
 
+// Live HTML preview for any type (uses a sample/real pilot's flight).
 router.post(
   '/event/:eventId/email/preview',
   ...adminOnly,
   asyncHandler(async (req, res) => {
     const event = await getEventOr404(req.params.eventId);
-    const type = req.body?.type || 'notam';
-    const opts = { ...(composerDefaults[type] || {}), ...(req.body || {}) };
-    if (type === 'report') {
-      const bookings = await loadBookings(event.id);
-      res.json({ html: composeFor('report', opts, eventCtx(event), event, bookings).html });
-      return;
-    }
+    const cfg = EMAIL_TYPES[req.body?.type] || EMAIL_TYPES.notam;
+    const opts = { ...composerDefaults[cfg.template], ...(req.body || {}) };
     const ctx = await sampleCtxFor(event);
-    res.json({ html: composeFor(type, opts, ctx, event).html });
+    res.json({ html: composeFor(cfg.template, opts, ctx, event).html });
   })
 );
 
+// Send one email of any type NOW, to its current audience. Admin-triggered only;
+// re-sendable; recipients + content are computed fresh from live bookings.
 router.post(
-  '/event/:eventId/email/reminder',
+  '/event/:eventId/email/send',
   ...adminOnly,
   asyncHandler(async (req, res) => {
     const event = await getEventOr404(req.params.eventId);
-    // Reminders go to pilots who actually booked - personalised with their flight.
-    const participants = await loadParticipants(event.id);
-    if (!participants.length) throw new ApiError(422, 'email.noRecipients');
-    const opts = { ...composerDefaults.reminder, ...(req.body || {}) };
+    const cfg = EMAIL_TYPES[req.body?.type];
+    if (!cfg) throw new ApiError(422, 'email.invalidType');
 
-    const claimId = await claimOnce(event.id, 'reminder', opts.subject || `Reminder: ${event.eventName}`, req.user.id);
-    try {
-      const messages = participants.map((p) => {
-        const { subject, html, text } = composeFor('reminder', opts, participantCtx(event, p), event);
-        return { to: p.email, subject, html, text };
-      });
-      const result = await sendBulk(messages);
-      if (result.total > 0 && result.sent === 0) { await releaseOnce(claimId); throw new ApiError(502, 'email.sendFailed'); }
-      await finalize(claimId, result);
-      await recordRecipients(claimId, participants, result);
-      await audit(req.user.id, 'email:reminder', 'event', event.id, { sent: result.sent, failed: result.failed });
-      res.json(result);
-    } catch (err) {
-      if (!(err instanceof ApiError)) await releaseOnce(claimId).catch(() => {});
-      throw err;
-    }
-  })
-);
-
-router.post(
-  '/event/:eventId/email/notam',
-  ...adminOnly,
-  asyncHandler(async (req, res) => {
-    const event = await getEventOr404(req.params.eventId);
-    // Audience is admin-selectable: all participants (default), only confirmed, only
-    // unconfirmed, and optionally a single VID.
-    const audience = ['participants', 'booked', 'unconfirmed'].includes(req.body?.audience) ? req.body.audience : 'participants';
-    const recipients = await loadAudience(event.id, audience, req.body?.vid);
+    const audience =
+      cfg.audience ||
+      (['participants', 'booked', 'unconfirmed'].includes(req.body?.audience) ? req.body.audience : 'participants');
+    const vid = cfg.audience ? undefined : req.body?.vid; // only NOTAM narrows to a single VID
+    const recipients = await loadAudience(event.id, audience, vid);
     if (!recipients.length) throw new ApiError(422, 'email.noRecipients');
-    const opts = { ...composerDefaults.notam, ...(req.body || {}) };
 
+    const opts = { ...composerDefaults[cfg.template], ...(req.body || {}) };
     const messages = recipients.map((p) => {
-      const { subject, html, text } = composeFor('notam', opts, participantCtx(event, p), event);
+      const { subject, html, text } = composeFor(cfg.template, opts, participantCtx(event, p), event);
       return { to: p.email, subject, html, text };
     });
     const result = await sendBulk(messages);
-    const emailId = await recordSend(event.id, 'notam', opts.subject || `NOTAM: ${event.eventName}`, req.user.id, result);
+    const emailId = await recordSend(event.id, cfg.logType, opts.subject || cfg.subject(event), req.user.id, result);
     await recordRecipients(emailId, recipients, result);
-    await audit(req.user.id, 'email:notam', 'event', event.id, { sent: result.sent, failed: result.failed, audience });
+    await audit(req.user.id, `email:${cfg.logType}`, 'event', event.id, { sent: result.sent, failed: result.failed, audience });
     res.json(result);
   })
 );
 
-// Send a single test email of any type to the requesting admin's own address, so they
-// can see exactly what pilots will receive. Not recorded in the log.
+// Send a single test copy of any type to the requesting admin's own address.
 router.post(
   '/event/:eventId/email/test',
   ...adminOnly,
@@ -250,36 +182,13 @@ router.post(
     const event = await getEventOr404(req.params.eventId);
     const to = req.user.email;
     if (!to) throw new ApiError(422, 'email.noSelfEmail');
-    const type = ['reminder', 'notam', 'confirmReminder'].includes(req.body?.type) ? req.body.type : 'notam';
-    const opts = { ...(composerDefaults[type] || composerDefaults.notam), ...(req.body || {}) };
-    // Use a real participant's data for a realistic preview when available.
+    const cfg = EMAIL_TYPES[req.body?.type] || EMAIL_TYPES.notam;
+    const opts = { ...composerDefaults[cfg.template], ...(req.body || {}) };
     const ctx = await sampleCtxFor(event);
-    const { subject, html, text } = composeFor(type, opts, ctx, event);
+    const { subject, html, text } = composeFor(cfg.template, opts, ctx, event);
     const result = await sendBulk([{ to, subject: `[TEST] ${subject}`, html, text }]);
-    await audit(req.user.id, 'email:test', 'event', event.id, { type, to });
+    await audit(req.user.id, 'email:test', 'event', event.id, { type: req.body?.type, to });
     res.json({ ...result, to });
-  })
-);
-
-// Manual confirm-booking reminder to pilots who have NOT confirmed yet (unlimited).
-router.post(
-  '/event/:eventId/email/confirm-reminder',
-  ...adminOnly,
-  asyncHandler(async (req, res) => {
-    const event = await getEventOr404(req.params.eventId);
-    const recipients = await loadUnconfirmed(event.id);
-    if (!recipients.length) throw new ApiError(422, 'email.noRecipients');
-    const opts = { ...composerDefaults.confirmReminder, ...(req.body || {}) };
-
-    const messages = recipients.map((p) => {
-      const { subject, html, text } = composeFor('confirmReminder', opts, participantCtx(event, p), event);
-      return { to: p.email, subject, html, text };
-    });
-    const result = await sendBulk(messages);
-    const emailId = await recordSend(event.id, 'confirm-reminder', opts.subject || `Confirm reminder: ${event.eventName}`, req.user.id, result);
-    await recordRecipients(emailId, recipients, result);
-    await audit(req.user.id, 'email:confirm-reminder', 'event', event.id, { sent: result.sent, failed: result.failed });
-    res.json(result);
   })
 );
 
@@ -298,82 +207,6 @@ router.get(
       { id: req.params.emailId, e: event.id }
     );
     res.json(rows.map((r) => ({ ...r, ok: Boolean(r.ok) })));
-  })
-);
-
-// ── Email approval queue ─────────────────────────────────────────────────────
-// Emails the SYSTEM wants to send (scheduled confirm reminders, cancellation
-// notices) are queued as pending approvals. NOTHING is emailed until an admin
-// approves an item here, so no email ever leaves without an explicit click.
-
-const APPROVAL_SUBJECT = {
-  'confirm-reminder': (e) => `Confirm reminder: ${e.eventName}`,
-  cancelled: (e) => `Cancelled: ${e.eventName}`,
-};
-
-// Pending approvals (optionally for one event), newest event context joined in.
-router.get(
-  '/email-approval',
-  ...adminOnly,
-  asyncHandler(async (req, res) => {
-    const eventId = req.query.eventId ? Number(req.query.eventId) : null;
-    const rows = await query(
-      `SELECT a.id, a.eventId, a.type, a.audienceCount, a.createdAt, e.eventName, e.dateStart
-         FROM email_approvals a JOIN events e ON e.id = a.eventId
-        WHERE a.status = 'pending' ${eventId ? 'AND a.eventId = :eventId' : ''}
-        ORDER BY a.createdAt ASC`,
-      eventId ? { eventId } : {}
-    );
-    res.json(rows);
-  })
-);
-
-// Approve a pending email: send it now (to the current audience) and log it.
-router.post(
-  '/email-approval/:id/approve',
-  ...adminOnly,
-  asyncHandler(async (req, res) => {
-    const ap = await queryOne("SELECT * FROM email_approvals WHERE id=:id AND status='pending'", { id: req.params.id });
-    if (!ap) throw new ApiError(404, 'approval.notFound');
-    const event = await getEventOr404(ap.eventId);
-
-    const isCancel = ap.type === 'cancelled';
-    const recipients = isCancel ? await loadParticipants(event.id) : await loadUnconfirmed(event.id);
-    const defaults = isCancel ? composerDefaults.cancelled : composerDefaults.confirmReminder;
-    const composerType = isCancel ? 'cancelled' : 'confirmReminder';
-
-    const messages = recipients.map((p) => {
-      const { subject, html, text } = composeFor(composerType, defaults, participantCtx(event, p), event);
-      return { to: p.email, subject, html, text };
-    });
-    const result = await sendBulk(messages);
-
-    if (result.total > 0) {
-      const emailId = await recordSend(event.id, ap.type, APPROVAL_SUBJECT[ap.type](event), req.user.id, result);
-      await recordRecipients(emailId, recipients, result);
-    }
-    await query("UPDATE email_approvals SET status='sent', decidedAt=UTC_TIMESTAMP(), decidedBy=:by WHERE id=:id", {
-      by: req.user.id,
-      id: ap.id,
-    });
-    await audit(req.user.id, `approve:${ap.type}`, 'event', event.id, { sent: result.sent, failed: result.failed });
-    res.json(result);
-  })
-);
-
-// Dismiss a pending email without sending it.
-router.post(
-  '/email-approval/:id/dismiss',
-  ...adminOnly,
-  asyncHandler(async (req, res) => {
-    const ap = await queryOne("SELECT id, eventId, type FROM email_approvals WHERE id=:id AND status='pending'", { id: req.params.id });
-    if (!ap) throw new ApiError(404, 'approval.notFound');
-    await query("UPDATE email_approvals SET status='dismissed', decidedAt=UTC_TIMESTAMP(), decidedBy=:by WHERE id=:id", {
-      by: req.user.id,
-      id: ap.id,
-    });
-    await audit(req.user.id, `dismiss:${ap.type}`, 'event', ap.eventId, null);
-    res.json({ ok: true });
   })
 );
 

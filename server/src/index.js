@@ -11,7 +11,6 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { config } from './config.js';
 import { pool } from './db/pool.js';
 import { getAllAirports, getAllAircraft, hasApiKey } from './ivao/dataApi.js';
-import { queueDueConfirmReminders } from './services/confirmReminders.js';
 import { errorHandler, notFound } from './middleware/error.js';
 
 import authRoutes from './routes/auth.routes.js';
@@ -114,9 +113,7 @@ async function start() {
     process.exit(1);
   }
   await autoAdvanceEventStatus();
-  await queueDueConfirmReminders();
   setInterval(autoAdvanceEventStatus, 60_000);
-  setInterval(queueDueConfirmReminders, 60_000);
   app.listen(config.port, () => {
     // eslint-disable-next-line no-console
     console.log(`🛫 BYBLOS · IVAO ${config.division} API listening on http://localhost:${config.port}`);

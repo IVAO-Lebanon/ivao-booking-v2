@@ -166,7 +166,6 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
       if (applied) {
         if (applied.confirmedPending) done.push(`${applied.confirmedPending} pending booking(s) confirmed`);
         if (applied.slotsShifted) done.push(`${applied.slotsShifted} slot time(s) shifted`);
-        if (applied.cancelQueued) done.push(`cancellation email queued for approval (${applied.cancelQueued} pilot(s))`);
         if (applied.overLimit) done.push(`${applied.overLimit} pilot(s) over the new limit (kept)`);
       }
       toast.success((editing ? 'Event updated.' : 'Event created.') + (done.length ? ` ${done.join('; ')}.` : ''));

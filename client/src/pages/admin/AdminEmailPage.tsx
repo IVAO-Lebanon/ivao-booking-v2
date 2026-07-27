@@ -32,7 +32,8 @@ export default function AdminEmailPage() {
 
       <EmailPanel event={event} />
       <p className="mt-2 text-xs text-fuselage-400">
-        Reminders go to pilots who booked; NOTAMs go to everyone participating. Both are personalised with each pilot's flight.
+        Every email is sent by you (never automatically), can be sent again any time, and is personalised with each pilot's
+        current flight. The recipient list is recalculated from live bookings each time you send.
       </p>
     </div>
   );

@@ -8,7 +8,6 @@ import { parsePagination, paginated } from '../utils/pagination.js';
 import { withEventState } from '../utils/eventState.js';
 import { audit } from '../utils/audit.js';
 import { getDivisionEvents, hasApiKey } from '../ivao/dataApi.js';
-import { loadParticipants } from '../services/eventEmails.js';
 
 const router = Router();
 
@@ -93,7 +92,7 @@ const truthy = (v) => Boolean(Number(v));
 // Works out what editing an event would do to its EXISTING bookings, so the admin
 // can be warned before saving. `deltaMinutes` is how far the event start moves.
 async function computeSideEffects(existing, data, deltaMinutes) {
-  const summary = { confirmPending: 0, dateShift: null, cancelNotify: 0, overLimit: 0, reminderRearm: false };
+  const summary = { confirmPending: 0, dateShift: null, overLimit: 0, reminderRearm: false };
 
   // Turning confirmation off: any still-provisional bookings become confirmed.
   if (truthy(existing.requireConfirmation) && !data.requireConfirmation) {
@@ -106,11 +105,6 @@ async function computeSideEffects(existing, data, deltaMinutes) {
     const r = await queryOne('SELECT COUNT(*) c FROM slots WHERE eventId=:e AND slotTime IS NOT NULL', { e: existing.id });
     const timedSlots = r ? r.c : 0;
     if (timedSlots > 0) summary.dateShift = { deltaMinutes, timedSlots };
-  }
-
-  // Cancelling: participants that would be emailed.
-  if (data.status === 'cancelled' && existing.status !== 'cancelled') {
-    summary.cancelNotify = (await loadParticipants(existing.id)).length;
   }
 
   // Lowering the per-pilot cap below what some pilots already hold (informational).
@@ -130,24 +124,6 @@ async function computeSideEffects(existing, data, deltaMinutes) {
   summary.reminderRearm = Boolean(data.requireConfirmation) && remChanged;
 
   return summary;
-}
-
-// Queues a cancellation notice for admin approval (no email is sent here). Deduped:
-// skips if a pending one already exists. Returns how many pilots it will reach.
-async function queueCancellationApproval(eventId) {
-  const recipients = await loadParticipants(eventId);
-  if (!recipients.length) return 0;
-  const pending = await queryOne(
-    "SELECT id FROM email_approvals WHERE eventId=:e AND type='cancelled' AND status='pending'",
-    { e: eventId }
-  );
-  if (!pending) {
-    await query(
-      "INSERT INTO email_approvals (eventId, type, audienceCount, status) VALUES (:e, 'cancelled', :n, 'pending')",
-      { e: eventId, n: recipients.length }
-    );
-  }
-  return recipients.length;
 }
 
 // List events. Public sees upcoming + scheduled; admins can pass showAll=true.
@@ -301,7 +277,7 @@ router.put(
     // Work out the side effects on existing bookings, and stop for the admin to
     // confirm the disruptive ones before anything is written.
     const effects = await computeSideEffects(existing, data, deltaMinutes);
-    const needsConfirm = effects.confirmPending > 0 || Boolean(effects.dateShift) || effects.cancelNotify > 0;
+    const needsConfirm = effects.confirmPending > 0 || Boolean(effects.dateShift);
     if (needsConfirm && !reconcile) throw new ApiError(409, 'event.reconcileRequired', effects);
 
     const applied = await transaction(async (tx) => {
@@ -375,16 +351,10 @@ router.put(
     await audit(req.user.id, 'update', 'event', existing.id);
     const updated = await queryOne('SELECT * FROM events WHERE id=:id', { id: existing.id });
 
-    // Cancelling does NOT email anyone directly: no email leaves the system without
-    // an admin approving it. Instead we queue a pending cancellation notice (deduped)
-    // that an admin approves from the Dashboard or the event's Email page.
-    let cancelQueued = 0;
-    if (data.status === 'cancelled' && existing.status !== 'cancelled') {
-      cancelQueued = await queueCancellationApproval(updated.id);
-    }
-
+    // Cancelling never emails anyone. If staff want to notify pilots, they send a
+    // Cancellation notice manually from the event's Email page.
     const decorated = await decorateEvent(updated);
-    res.json({ ...decorated, applied: { ...applied, cancelQueued, overLimit: effects.overLimit } });
+    res.json({ ...decorated, applied: { ...applied, overLimit: effects.overLimit } });
   })
 );
 
