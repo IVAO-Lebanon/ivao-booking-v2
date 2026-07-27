@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler, ApiError } from '../middleware/error.js';
-import { getAirport, getAirportBrief, searchAirports, hasApiKey } from '../ivao/dataApi.js';
+import { getAirport, getAirportBrief, getMetar, getTaf, searchAirports, hasApiKey } from '../ivao/dataApi.js';
+import { mergeAirportSearch, resolveAirport } from '../services/customData.js';
 
 const router = Router();
 
@@ -10,25 +11,29 @@ function assertIcao(raw) {
   return icao;
 }
 
-// Typeahead search over the IVAO airport catalogue (cached in memory, by ICAO or name).
+// Typeahead search: custom airports plus the IVAO catalogue, custom overriding IVAO.
 router.get(
   '/',
   asyncHandler(async (req, res) => {
     const q = String(req.query.search || '').trim();
-    if (q.length < 2 || !hasApiKey()) return res.json([]);
+    if (q.length < 2) return res.json([]);
+    let ivao = [];
     try {
-      res.json(await searchAirports(q));
+      if (hasApiKey()) ivao = await searchAirports(q);
     } catch {
-      res.json([]); // IVAO catalogue unavailable
+      ivao = []; // IVAO catalogue unavailable; custom results still work
     }
+    res.json(await mergeAirportSearch(ivao, q));
   })
 );
 
-// Raw airport record (back-compat).
+// Raw airport record (back-compat). A custom airport overrides the IVAO one.
 router.get(
   '/details/:icao',
   asyncHandler(async (req, res) => {
     const icao = assertIcao(req.params.icao);
+    const custom = await resolveAirport(icao);
+    if (custom) return res.json({ ...custom, available: true });
     if (!hasApiKey()) return res.json({ icao, name: icao, available: false });
     try {
       const data = await getAirport(icao);
@@ -41,11 +46,20 @@ router.get(
   })
 );
 
-// Airport essentials + live METAR/TAF for the flight detail view.
+// Airport essentials + live METAR/TAF for the flight detail view. A custom airport
+// overrides the IVAO record (name/coords), but weather is still pulled from IVAO
+// since a real ICAO may still report even when a division has customised it.
 router.get(
   '/:icao/brief',
   asyncHandler(async (req, res) => {
     const icao = assertIcao(req.params.icao);
+    const custom = await resolveAirport(icao);
+    if (custom) {
+      const [metar, taf] = hasApiKey()
+        ? await Promise.all([getMetar(icao).catch(() => null), getTaf(icao).catch(() => null)])
+        : [null, null];
+      return res.json({ ...custom, available: true, metar, taf });
+    }
     if (!hasApiKey()) return res.json({ icao, available: false, metar: null, taf: null });
     try {
       res.json(await getAirportBrief(icao));

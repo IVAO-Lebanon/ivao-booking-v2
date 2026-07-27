@@ -73,6 +73,11 @@ export function AircraftInput({
                   {a.model}
                   {a.manufacturer ? ` · ${a.manufacturer}` : ''}
                 </span>
+                {a.custom && (
+                  <span className="ml-auto shrink-0 rounded bg-atmos-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-atmos-700 dark:bg-atmos-900/40 dark:text-atmos-300">
+                    Custom
+                  </span>
+                )}
               </button>
             </li>
           ))}

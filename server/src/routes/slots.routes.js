@@ -12,6 +12,16 @@ import { eventState } from '../utils/eventState.js';
 import { parseCsv, toCsv } from '../utils/csv.js';
 import { audit } from '../utils/audit.js';
 import { unknownAirports } from '../ivao/dataApi.js';
+import { customAirportIcaoSet } from '../services/customData.js';
+
+// Airport codes that are neither in the IVAO catalogue NOR a staff-defined custom
+// airport. Custom airports count as known so slots can use event-only/fictional fields.
+async function unknownAirportsExcludingCustom(icaos) {
+  const bad = await unknownAirports(icaos);
+  if (!bad.size) return bad;
+  const custom = await customAirportIcaoSet();
+  return new Set([...bad].filter((c) => !custom.has(String(c).toUpperCase())));
+}
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
@@ -203,7 +213,7 @@ router.get(
 // origin/destination is allowed - that's an open/private slot). No-ops if the IVAO
 // catalogue is unavailable, so we never block on a check we can't perform.
 async function assertAirportsExist(...icaos) {
-  const bad = await unknownAirports(icaos.filter(Boolean));
+  const bad = await unknownAirportsExcludingCustom(icaos.filter(Boolean));
   if (bad.size) throw new ApiError(422, 'slot.invalidAirport', { airports: [...bad] });
 }
 
@@ -290,7 +300,7 @@ router.post(
       if (d.origin) codes.add(d.origin);
       if (d.destination) codes.add(d.destination);
     }
-    const bad = await unknownAirports([...codes]);
+    const bad = await unknownAirportsExcludingCustom([...codes]);
     if (bad.size) {
       for (const { i, d } of valid) {
         if (d.origin && bad.has(d.origin)) issues.push({ row: i + 1, field: 'origin', message: `origin: "${d.origin}" is not a known airport ICAO` });

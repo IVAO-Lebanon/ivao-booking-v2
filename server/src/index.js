@@ -25,6 +25,7 @@ import simulatorRoutes from './routes/simulators.routes.js';
 import userRoutes from './routes/users.routes.js';
 import airportRoutes from './routes/airports.routes.js';
 import referenceRoutes from './routes/reference.routes.js';
+import customRoutes from './routes/custom.routes.js';
 import reportRoutes from './routes/reports.routes.js';
 
 const app = express();
@@ -83,6 +84,7 @@ app.use('/simulator', simulatorRoutes);
 app.use('/user', userRoutes);
 app.use('/airport', airportRoutes);
 app.use('/ref', referenceRoutes);
+app.use('/custom', customRoutes);
 app.use('/', slotRoutes); // /event/:id/slot* and /slot/*
 app.use('/', liveRoutes); // /event/:id/live
 app.use('/', emailRoutes); // /event/:id/email/*

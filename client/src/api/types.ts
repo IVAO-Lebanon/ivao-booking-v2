@@ -170,6 +170,28 @@ export interface AircraftType {
   description?: string | null;
   wtc?: string | null;
   manufacturer?: string | null;
+  custom?: boolean;
+}
+
+/** A staff-defined custom airport (supplements/overrides the IVAO catalogue). */
+export interface CustomAirport {
+  icao: string;
+  iata: string | null;
+  name: string;
+  city: string | null;
+  countryId: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  elevation: number | null;
+}
+
+/** A staff-defined custom aircraft type. */
+export interface CustomAircraft {
+  icao: string;
+  iata: string | null;
+  model: string;
+  manufacturer: string | null;
+  wtc: string | null;
 }
 
 export interface Paginated<T> {

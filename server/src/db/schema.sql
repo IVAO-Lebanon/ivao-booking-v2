@@ -200,3 +200,32 @@ CREATE TABLE IF NOT EXISTS event_email_recipients (
   KEY idx_eer_email (emailId),
   CONSTRAINT fk_eer_email FOREIGN KEY (emailId) REFERENCES event_emails(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Staff-defined custom airports. These supplement the IVAO catalogue and, when an
+-- ICAO matches, OVERRIDE it in the typeaheads and flight map (e.g. an event-only or
+-- fictional field). Coordinates feed the route map; weather still comes from IVAO.
+CREATE TABLE IF NOT EXISTS custom_airports (
+  icao       CHAR(4) NOT NULL PRIMARY KEY,
+  iata       VARCHAR(4) NULL,
+  name       VARCHAR(120) NOT NULL,
+  city       VARCHAR(120) NULL,
+  countryId  VARCHAR(2) NULL,
+  latitude   DOUBLE NULL,
+  longitude  DOUBLE NULL,
+  elevation  INT NULL,
+  createdBy  BIGINT UNSIGNED NULL,
+  createdAt  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Staff-defined custom aircraft types (supplement/override the IVAO catalogue).
+CREATE TABLE IF NOT EXISTS custom_aircraft (
+  icao         VARCHAR(4) NOT NULL PRIMARY KEY,
+  iata         VARCHAR(4) NULL,
+  model        VARCHAR(120) NOT NULL,
+  manufacturer VARCHAR(120) NULL,
+  wtc          CHAR(1) NULL,
+  createdBy    BIGINT UNSIGNED NULL,
+  createdAt    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updatedAt    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

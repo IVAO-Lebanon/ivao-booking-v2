@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler, ApiError } from '../middleware/error.js';
 import { getRoutes, getTextureImage, getAirlineTextures, searchAircraft, getAircraftType, hasApiKey } from '../ivao/dataApi.js';
+import { mergeAircraftSearch, resolveAircraftType } from '../services/customData.js';
 
 const router = Router();
 
@@ -15,25 +16,29 @@ function pickLivery(textures) {
   return pool[0] || null;
 }
 
-// Aircraft typeahead - served live from the IVAO aircraft catalogue (cached in memory).
+// Aircraft typeahead: custom aircraft plus the IVAO catalogue, custom overriding IVAO.
 router.get(
   '/aircraft',
   asyncHandler(async (req, res) => {
     const q = String(req.query.search || '').trim();
-    if (q.length < 1 || !hasApiKey()) return res.json([]);
+    if (q.length < 1) return res.json([]);
+    let ivao = [];
     try {
-      res.json(await searchAircraft(q));
+      if (hasApiKey()) ivao = await searchAircraft(q);
     } catch {
-      res.json([]);
+      ivao = [];
     }
+    res.json(await mergeAircraftSearch(ivao, q));
   })
 );
 
-// Single aircraft type (for the flight detail view) - from the IVAO catalogue.
+// Single aircraft type (for the flight detail view). A custom type overrides IVAO.
 router.get(
   '/aircraft/:icao',
   asyncHandler(async (req, res) => {
     const icao = String(req.params.icao || '').toUpperCase();
+    const custom = await resolveAircraftType(icao);
+    if (custom) return res.json({ ...custom, available: true });
     if (!hasApiKey()) return res.json({ icao, available: false });
     try {
       res.json(await getAircraftType(icao));

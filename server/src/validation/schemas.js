@@ -151,6 +151,62 @@ export const simulatorSchema = z.object({
 
 export const simulatorUpdateSchema = simulatorSchema.omit({ code: true });
 
+// ── Custom reference data (airports / aircraft) ──
+// Required, normalized-to-uppercase ICAO (the slot-field `icao`/`aircraftIcao`
+// above are optional/nullable, so these need their own definitions).
+const customAirportIcao = z.preprocess(
+  (v) => String(v ?? '').trim().toUpperCase(),
+  z.string().regex(/^[A-Z]{4}$/, 'ICAO must be 4 letters (A-Z).')
+);
+const customAircraftIcao = z.preprocess(
+  (v) => String(v ?? '').trim().toUpperCase(),
+  z.string().regex(/^[A-Z0-9]{2,4}$/, 'Aircraft ICAO must be 2 to 4 letters or digits.')
+);
+const optStr = (max) =>
+  z.preprocess((v) => {
+    const s = v == null ? '' : String(v).trim();
+    return s === '' ? null : s;
+  }, z.string().max(max).nullable());
+const optUpper = (max) =>
+  z.preprocess((v) => {
+    const s = v == null ? '' : String(v).trim().toUpperCase();
+    return s === '' ? null : s;
+  }, z.string().max(max).nullable());
+const optNum = (min, max) =>
+  z.preprocess((v) => {
+    if (v == null || String(v).trim() === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : NaN;
+  }, z.number().min(min).max(max).nullable());
+
+export const customAirportSchema = z.object({
+  icao: customAirportIcao,
+  iata: optUpper(4),
+  name: z.string().trim().min(1).max(120),
+  city: optStr(120),
+  countryId: optUpper(2),
+  latitude: optNum(-90, 90),
+  longitude: optNum(-180, 180),
+  elevation: z.preprocess((v) => {
+    if (v == null || String(v).trim() === '') return null;
+    const n = Math.floor(Number(v));
+    return Number.isFinite(n) ? n : NaN;
+  }, z.number().int().min(-2000).max(30000).nullable()),
+});
+export const customAirportUpdateSchema = customAirportSchema.omit({ icao: true });
+
+export const customAircraftSchema = z.object({
+  icao: customAircraftIcao,
+  iata: optUpper(4),
+  model: z.string().trim().min(1).max(120),
+  manufacturer: optStr(120),
+  wtc: z.preprocess((v) => {
+    const s = v == null ? '' : String(v).trim().toUpperCase();
+    return s === '' ? null : s;
+  }, z.enum(['L', 'M', 'H', 'J']).nullable()),
+});
+export const customAircraftUpdateSchema = customAircraftSchema.omit({ icao: true });
+
 export const scenerySchema = z.object({
   icao: z.string().regex(/^[A-Z]{4}$/),
   title: z.string().min(1).max(255),

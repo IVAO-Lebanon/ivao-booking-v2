@@ -38,9 +38,7 @@ const NAV = [
 const ADMIN_NAV = [
   { to: '/admin', label: 'Dashboard', end: true },
   { to: '/admin/events', label: 'Events' },
-  { to: '/admin/event-types', label: 'Event types' },
-  { to: '/admin/sceneries', label: 'Sceneries' },
-  { to: '/admin/simulators', label: 'Simulators' },
+  { to: '/admin/custom-data', label: 'Custom data' },
   { to: '/admin/users', label: 'Users' },
 ];
 

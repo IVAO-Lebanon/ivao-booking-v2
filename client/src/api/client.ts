@@ -3,6 +3,8 @@ import type {
   AdminStats,
   AircraftType,
   AirportBrief,
+  CustomAirport,
+  CustomAircraft,
   EmailResult,
   EmailStatus,
   EmailRecipient,
@@ -150,7 +152,7 @@ class ApiClient {
   airportBrief = (icao: string) =>
     this.axios.get<AirportBrief>(`/airport/${icao}/brief`).then((r) => r.data);
   airportSearch = (search: string) =>
-    this.axios.get<{ icao: string; iata: string | null; name: string; city: string | null; countryId: string | null }[]>('/airport', { params: { search } }).then((r) => r.data);
+    this.axios.get<{ icao: string; iata: string | null; name: string; city: string | null; countryId: string | null; custom?: boolean }[]>('/airport', { params: { search } }).then((r) => r.data);
 
   // ── IVAO reference data (synced) ──
   aircraftRef = (icao: string) =>
@@ -199,6 +201,19 @@ class ApiClient {
     this.axios.post<EmailResult & { to: string }>(`/event/${eventId}/email/test`, body).then((r) => r.data);
   emailRecipients = (eventId: number, emailId: number) =>
     this.axios.get<EmailRecipient[]>(`/event/${eventId}/email/${emailId}/recipients`).then((r) => r.data);
+
+  // ── Custom data (airports / aircraft) ──
+  customAirports = () => this.axios.get<CustomAirport[]>('/custom/airport').then((r) => r.data);
+  createCustomAirport = (data: unknown) => this.axios.post<CustomAirport>('/custom/airport', data).then((r) => r.data);
+  updateCustomAirport = (icao: string, data: unknown) =>
+    this.axios.put<CustomAirport>(`/custom/airport/${icao}`, data).then((r) => r.data);
+  deleteCustomAirport = (icao: string) => this.axios.delete(`/custom/airport/${icao}`).then(() => {});
+
+  customAircraft = () => this.axios.get<CustomAircraft[]>('/custom/aircraft').then((r) => r.data);
+  createCustomAircraft = (data: unknown) => this.axios.post<CustomAircraft>('/custom/aircraft', data).then((r) => r.data);
+  updateCustomAircraft = (icao: string, data: unknown) =>
+    this.axios.put<CustomAircraft>(`/custom/aircraft/${icao}`, data).then((r) => r.data);
+  deleteCustomAircraft = (icao: string) => this.axios.delete(`/custom/aircraft/${icao}`).then(() => {});
 
   // ── Users / stats ──
   users = (params: Record<string, unknown> = {}) =>
