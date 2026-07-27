@@ -43,14 +43,19 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: E
     requestAnimationFrame(() => { el.focus(); el.selectionStart = el.selectionEnd = start + token.length; });
   };
 
-  // Only the announcement (NOTAM) lets the admin pick who receives it.
-  const [audience, setAudience] = useState<'participants' | 'booked' | 'unconfirmed'>('participants');
+  // Only the announcement (NOTAM) lets the admin pick who receives it. "one" means
+  // a single pilot (by VID); it maps to searching all participants for that VID.
+  const [audience, setAudience] = useState<'participants' | 'booked' | 'unconfirmed' | 'one'>('participants');
   const [vid, setVid] = useState('');
   const meta = MODE_META[mode];
 
   const send = useMutation({
-    mutationFn: () =>
-      api.sendEmail(event.id, meta.pickAudience ? { type: mode, ...f, audience, vid: vid.trim() || undefined } : { type: mode, ...f }),
+    mutationFn: () => {
+      if (!meta.pickAudience) return api.sendEmail(event.id, { type: mode, ...f });
+      const audienceParam = audience === 'one' ? 'participants' : audience;
+      const vidParam = audience === 'one' ? vid.trim() || undefined : undefined;
+      return api.sendEmail(event.id, { type: mode, ...f, audience: audienceParam, vid: vidParam });
+    },
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['email-status', event.id] });
       toast.success(`Sent ${r.sent}/${r.total}${r.failed ? ` · ${r.failed} failed` : ''}.`);
@@ -68,11 +73,15 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: E
   const [showAdvanced, setShowAdvanced] = useState(false);
   const audienceCount = !meta.pickAudience
     ? undefined
-    : audience === 'booked'
-      ? Math.max(0, status.participantCount - status.unconfirmedCount)
-      : audience === 'unconfirmed'
-        ? status.unconfirmedCount
-        : status.participantCount;
+    : audience === 'one'
+      ? vid.trim()
+        ? 1
+        : 0
+      : audience === 'booked'
+        ? Math.max(0, status.participantCount - status.unconfirmedCount)
+        : audience === 'unconfirmed'
+          ? status.unconfirmedCount
+          : status.participantCount;
 
   const field = (k: keyof EmailFields, label: string, placeholder = '') => (
     <div>
@@ -108,19 +117,27 @@ function Composer({ event, mode, status, onClose }: { event: EventModel; mode: E
             {meta.pickAudience && (
               <div className="space-y-2 rounded-lg border border-fuselage-200 p-3 dark:border-fuselage-700">
                 <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-fuselage-400">
-                  <Users size={13} /> Audience
+                  <Users size={13} /> Send to
                 </div>
                 <Select
                   position="popper"
                   value={audience}
                   onValueChange={(v) => setAudience(v as typeof audience)}
                   items={[
-                    { value: 'participants', label: `All participants (${status.participantCount})` },
+                    { value: 'participants', label: `Everyone who booked (${status.participantCount})` },
                     { value: 'booked', label: `Confirmed only (${Math.max(0, status.participantCount - status.unconfirmedCount)})` },
                     { value: 'unconfirmed', label: `Awaiting confirmation (${status.unconfirmedCount})` },
+                    { value: 'one', label: 'One specific pilot' },
                   ]}
                 />
-                <input className="input font-mono" placeholder="Only this VID (optional)" value={vid} onChange={(e) => setVid(e.target.value.replace(/[^0-9]/g, ''))} />
+                {audience === 'one' && (
+                  <input
+                    className="input font-mono"
+                    placeholder="Pilot VID (e.g. 540123)"
+                    value={vid}
+                    onChange={(e) => setVid(e.target.value.replace(/[^0-9]/g, ''))}
+                  />
+                )}
               </div>
             )}
 
