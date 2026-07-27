@@ -63,6 +63,18 @@ class ApiClient {
 
   constructor() {
     this.axios = axios.create({ baseURL: API_BASE });
+    // Guard against a misconfigured VITE_API_BASE: if it points at the web app's
+    // own origin, the SPA fallback returns index.html (200) and JSON endpoints get
+    // HTML back. Fail loudly with a clear message instead of a cryptic render crash.
+    this.axios.interceptors.response.use((r) => {
+      const ct = String(r.headers?.['content-type'] || '');
+      if (r.config?.responseType !== 'blob' && ct.includes('text/html')) {
+        throw new Error(
+          `API returned HTML, not JSON, for ${r.config?.url}. Check VITE_API_BASE (it must point at the API server, e.g. https://api.booking.<div>.ivao.aero), not the web app origin.`
+        );
+      }
+      return r;
+    });
   }
 
   setToken(token: string) {

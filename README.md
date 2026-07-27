@@ -196,6 +196,12 @@ You now have the full project on the server, including both the `server/` and `c
 
 Your API is now running. To confirm it works, visit `https://api.booking.<div>.ivao.aero/health` in a browser. You should see a short status response.
 
+> **Important:** the API subdomain must serve **only** the Node app. It must NOT
+> contain the web app's SPA `.htaccess` (the `RewriteRule . /index.html` from
+> Step 6). If it does, requests like `/event` loop and Apache returns
+> `AH00124: Request exceeded the limit of 10 internal redirects`. The API needs no
+> rewrite rules at all; Passenger routes requests to Node.
+
 ### Step 6: Build and publish the web app
 
 The web app is a set of static files that must be built once, then served.
@@ -204,8 +210,9 @@ The web app is a set of static files that must be built once, then served.
 2. In **File Manager**, go into the `client` folder, copy `.env.example` to `.env`, and set:
 
    ```env
-   # Address of the API from Step 3, with /api on the end:
-   VITE_API_BASE=https://api.booking.<div>.ivao.aero/api
+   # Full URL of the API host, with NO /api suffix (the API serves /event, /auth
+   # at the root). Point it at the API subdomain, not the web app origin:
+   VITE_API_BASE=https://api.booking.<div>.ivao.aero
 
    # Public IVAO client id (same value as IVAO_CLIENT_ID above):
    VITE_IVAO_CLIENT_ID=
@@ -219,7 +226,7 @@ The web app is a set of static files that must be built once, then served.
 4. Set the website's **document root** to `client/dist`:
    - Open **Hosting Settings** for the web app domain.
    - Change **Document root** to `client/dist` and save.
-5. Add an `.htaccess` file inside `client/dist` so that page links do not show "Not Found". In **File Manager**, create a file named `.htaccess` in `client/dist` with exactly this content:
+5. Add an `.htaccess` file inside `client/dist` so that page links do not show "Not Found". This belongs to the **web app only** (never the API subdomain, see the warning in Step 5). In **File Manager**, create a file named `.htaccess` in `client/dist` with exactly this content:
 
    ```apache
    <IfModule mod_rewrite.c>
