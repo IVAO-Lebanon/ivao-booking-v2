@@ -55,6 +55,8 @@ export const config = {
     pass: process.env.SMTP_PASS || '',
     from: process.env.MAIL_FROM || 'BYBLOS <no-reply@ivao.aero>',
     eventsDept: process.env.EVENTS_DEPT_EMAIL || '',
+    // Accept a self-signed / mismatched TLS cert (e.g. SMTP_HOST=localhost).
+    allowInvalidCert: bool(process.env.SMTP_ALLOW_INVALID_CERT, false),
   },
 
   division: process.env.IVAO_DIVISION || 'LB',

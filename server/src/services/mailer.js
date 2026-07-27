@@ -19,6 +19,14 @@ function getTransport() {
       port: config.email.port,
       secure: config.email.secure,
       auth: { user: config.email.user, pass: config.email.pass },
+      // Fail fast: without these a wrong host (e.g. one behind a proxy that does
+      // not pass SMTP) leaves the request hanging until a very long default timeout.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
+      // Allow a self-signed / hostname-mismatched cert (common when SMTP_HOST is
+      // localhost on the same box). Opt-in via SMTP_ALLOW_INVALID_CERT=true.
+      ...(config.email.allowInvalidCert ? { tls: { rejectUnauthorized: false } } : {}),
     });
   } else {
     // Dev: pretend-send (no SMTP). Messages resolve as sent.
