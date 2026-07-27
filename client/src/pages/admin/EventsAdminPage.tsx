@@ -1,10 +1,11 @@
 import { FormEvent, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, apiErrorMessage } from '../../api/client';
-import type { EventModel, IvaoImportEvent } from '../../api/types';
+import { api, apiErrorMessage, apiErrorDetails } from '../../api/client';
+import type { EventModel, IvaoImportEvent, ReconcileSummary } from '../../api/types';
 import { Select, Switch } from '@ivao/atmosphere-react';
 import { Modal, Spinner, PageLoader, EmptyState, StatusBadge, Pagination, FormError } from '../../components/ui';
+import { ReconcileDialog } from '../../components/ReconcileDialog';
 import { Plus, DownloadCloud, ChevronDown, ChevronRight } from 'lucide-react';
 import { useToast } from '../../components/Toast';
 import { useConfirm } from '../../components/Confirm';
@@ -131,8 +132,12 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
       : { ...EMPTY }
   );
 
+  // When a save would affect existing bookings, the server asks us to confirm; we
+  // hold the summary here and re-submit with the admin's decision.
+  const [reconcilePrompt, setReconcilePrompt] = useState<ReconcileSummary | null>(null);
+
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: (reconcile?: { shiftSlots?: boolean }) => {
       // Numeric fields come off text/number inputs as strings; coerce them (with safe
       // fallbacks) so an emptied field never reaches the server as "" and trips Zod.
       const intOr = (v: unknown, fallback: number) => {
@@ -151,15 +156,35 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
         confirmReminderHoursBefore: intOr(f.confirmReminderHoursBefore, 0),
         confirmReminderAt: f.requireConfirmation && f.confirmReminderAt ? toUnix(f.confirmReminderAt) : null,
       };
-      return editing ? api.updateEvent(editing.id, payload) : api.createEvent(payload);
+      return editing ? api.updateEvent(editing.id, payload, reconcile) : api.createEvent(payload);
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ['admin-events'] });
       qc.invalidateQueries({ queryKey: ['events'] });
-      toast.success(editing ? 'Event updated.' : 'Event created.');
+      const applied = (result as EventModel).applied;
+      const done: string[] = [];
+      if (applied) {
+        if (applied.confirmedPending) done.push(`${applied.confirmedPending} pending booking(s) confirmed`);
+        if (applied.slotsShifted) done.push(`${applied.slotsShifted} slot time(s) shifted`);
+        if (applied.cancelEmails) done.push(`${applied.cancelEmails} pilot(s) emailed`);
+        if (applied.overLimit) done.push(`${applied.overLimit} pilot(s) over the new limit (kept)`);
+      }
+      toast.success((editing ? 'Event updated.' : 'Event created.') + (done.length ? ` ${done.join('; ')}.` : ''));
+      setReconcilePrompt(null);
       onClose();
     },
-    onError: (e) => setError(describeError(e)),
+    onError: (e) => {
+      // The server refuses the first save when existing bookings would be affected,
+      // and returns a summary; show it and let the admin decide.
+      if (apiErrorMessage(e) === 'event.reconcileRequired') {
+        const summary = apiErrorDetails<ReconcileSummary>(e);
+        if (summary) {
+          setReconcilePrompt(summary);
+          return;
+        }
+      }
+      setError(describeError(e));
+    },
   });
 
   const set = (k: string) => (e: any) => setF((s) => ({ ...s, [k]: e.target.value }));
@@ -211,14 +236,27 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
   };
 
   return (
-    <Modal open onClose={onClose} title={editing ? 'Edit event' : 'Create event'} maxWidth="max-w-2xl">
+    <Modal
+      open
+      onClose={onClose}
+      title={reconcilePrompt ? 'Review changes' : editing ? 'Edit event' : 'Create event'}
+      maxWidth="max-w-2xl"
+    >
+      {reconcilePrompt ? (
+        <ReconcileDialog
+          summary={reconcilePrompt}
+          pending={save.isPending}
+          onCancel={() => setReconcilePrompt(null)}
+          onApply={(shiftSlots) => save.mutate({ shiftSlots })}
+        />
+      ) : (
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
           const err = validate();
           if (err) { setError(err); return; }
           setError('');
-          save.mutate();
+          save.mutate(undefined);
         }}
         className="space-y-3"
       >
@@ -453,6 +491,7 @@ function EventForm({ editing, onClose }: { editing: EventModel | null; onClose: 
           </button>
         </div>
       </form>
+      )}
     </Modal>
   );
 }

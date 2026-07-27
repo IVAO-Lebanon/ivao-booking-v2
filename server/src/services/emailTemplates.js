@@ -247,6 +247,21 @@ export const composerDefaults = {
     ctaUrl: '',
     footerNote: '',
   },
+  cancelled: {
+    subject: 'Cancelled: {{eventName}}',
+    headerTag: 'Event cancelled',
+    label: 'Event cancelled',
+    title: '{{eventName}}',
+    greeting: 'Dear {{pilotName}},',
+    message:
+      'We are sorry to let you know that {{eventName}}, scheduled for {{eventDate}} at {{eventTime}}, has been cancelled. Your booking will not take place. We hope to see you at a future event.',
+    showFlightCard: true,
+    showEventStrip: false,
+    ctaShow: false,
+    ctaLabel: 'View event',
+    ctaUrl: '',
+    footerNote: '',
+  },
 };
 
 /** Build the full HTML body from the composer's structured fields (all optional). */

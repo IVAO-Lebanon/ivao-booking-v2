@@ -71,6 +71,25 @@ export interface EventModel {
   pastConfirmDeadline: boolean;
   confirmOpensAt: string | null;
   confirmDeadline: string | null;
+  // Present only on the response to an event update: what the save reconciled.
+  applied?: EventUpdateApplied;
+}
+
+/** Side effects an event edit would have on existing bookings (409 preview). */
+export interface ReconcileSummary {
+  confirmPending: number;
+  dateShift: { deltaMinutes: number; timedSlots: number } | null;
+  cancelNotify: number;
+  overLimit: number;
+  reminderRearm: boolean;
+}
+
+/** What an applied event update actually did to existing bookings. */
+export interface EventUpdateApplied {
+  confirmedPending: number;
+  slotsShifted: number;
+  cancelEmails: number;
+  overLimit: number;
 }
 
 export interface IvaoEventRoute {

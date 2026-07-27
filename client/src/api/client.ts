@@ -92,7 +92,10 @@ class ApiClient {
     this.axios.get<Paginated<EventModel>>('/event', { params }).then((r) => r.data);
   event = (id: number) => this.axios.get<EventModel>(`/event/${id}`).then((r) => r.data);
   createEvent = (data: unknown) => this.axios.post<EventModel>('/event', data).then((r) => r.data);
-  updateEvent = (id: number, data: unknown) => this.axios.put<EventModel>(`/event/${id}`, data).then((r) => r.data);
+  updateEvent = (id: number, data: unknown, reconcile?: { shiftSlots?: boolean }) =>
+    this.axios
+      .put<EventModel>(`/event/${id}`, reconcile ? { ...(data as object), reconcile } : data)
+      .then((r) => r.data);
   deleteEvent = (id: number) => this.axios.delete(`/event/${id}`).then(() => {});
 
   // ── Import published events from the IVAO API (admin, this division only) ──

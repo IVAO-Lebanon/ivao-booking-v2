@@ -173,7 +173,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE TABLE IF NOT EXISTS event_emails (
   id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
   eventId     BIGINT UNSIGNED NOT NULL,
-  type        ENUM('reminder','report','notam','confirm-reminder') NOT NULL,
+  type        ENUM('reminder','report','notam','confirm-reminder','cancelled') NOT NULL,
   -- 'once' for reminder/report (so the UNIQUE key blocks a second send), a unique
   -- token per notam (so NOTAMs are unlimited).
   onceKey     VARCHAR(40) NOT NULL DEFAULT 'once',

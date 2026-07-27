@@ -8,6 +8,9 @@ import { parsePagination, paginated } from '../utils/pagination.js';
 import { withEventState } from '../utils/eventState.js';
 import { audit } from '../utils/audit.js';
 import { getDivisionEvents, hasApiKey } from '../ivao/dataApi.js';
+import { sendBulk } from '../services/mailer.js';
+import { composerDefaults } from '../services/emailTemplates.js';
+import { loadParticipants, participantCtx, composeFor } from '../services/eventEmails.js';
 
 const router = Router();
 
@@ -78,6 +81,84 @@ async function replaceAirports(tx, eventId, airportList) {
   for (const icao of icaos) {
     await tx.query('INSERT INTO event_airports (eventId, icao) VALUES (:e,:i)', { e: eventId, i: icao });
   }
+}
+
+// A stored UTC DATETIME string ("YYYY-MM-DD HH:mm:ss") to a unix-seconds value.
+function mysqlToUnix(v) {
+  if (!v) return null;
+  const s = String(v).replace(' ', 'T');
+  return Math.floor(Date.parse(/Z$/.test(s) ? s : s + 'Z') / 1000);
+}
+
+const truthy = (v) => Boolean(Number(v));
+
+// Works out what editing an event would do to its EXISTING bookings, so the admin
+// can be warned before saving. `deltaMinutes` is how far the event start moves.
+async function computeSideEffects(existing, data, deltaMinutes) {
+  const summary = { confirmPending: 0, dateShift: null, cancelNotify: 0, overLimit: 0, reminderRearm: false };
+
+  // Turning confirmation off: any still-provisional bookings become confirmed.
+  if (truthy(existing.requireConfirmation) && !data.requireConfirmation) {
+    const r = await queryOne("SELECT COUNT(*) c FROM slots WHERE eventId=:e AND bookingStatus='prebooked'", { e: existing.id });
+    summary.confirmPending = r ? r.c : 0;
+  }
+
+  // Moving the event: slot times are absolute, so they desync unless shifted.
+  if (deltaMinutes && Number.isFinite(deltaMinutes)) {
+    const r = await queryOne('SELECT COUNT(*) c FROM slots WHERE eventId=:e AND slotTime IS NOT NULL', { e: existing.id });
+    const timedSlots = r ? r.c : 0;
+    if (timedSlots > 0) summary.dateShift = { deltaMinutes, timedSlots };
+  }
+
+  // Cancelling: participants that would be emailed.
+  if (data.status === 'cancelled' && existing.status !== 'cancelled') {
+    summary.cancelNotify = (await loadParticipants(existing.id)).length;
+  }
+
+  // Lowering the per-pilot cap below what some pilots already hold (informational).
+  if (data.maxBookingsPerPilot > 0) {
+    const rows = await query(
+      `SELECT pilotId FROM slots WHERE eventId=:e AND bookingStatus<>'free' AND pilotId IS NOT NULL
+        GROUP BY pilotId HAVING COUNT(*) > :max`,
+      { e: existing.id, max: data.maxBookingsPerPilot }
+    );
+    summary.overLimit = rows.length;
+  }
+
+  // Reminder rescheduled: re-arm so it can fire again even if already sent.
+  const remChanged =
+    Number(existing.confirmReminderHoursBefore || 0) !== Number(data.confirmReminderHoursBefore || 0) ||
+    mysqlToUnix(existing.confirmReminderAt) !== (data.confirmReminderAt || null);
+  summary.reminderRearm = Boolean(data.requireConfirmation) && remChanged;
+
+  return summary;
+}
+
+// Sends the cancellation notice to every participant with an email, and logs it
+// once in event_emails (type 'cancelled') for the audit + email history.
+async function sendCancellationEmails(event, userId) {
+  const recipients = await loadParticipants(event.id);
+  if (!recipients.length) return { total: 0, sent: 0, failed: 0 };
+  const opts = composerDefaults.cancelled;
+  const messages = recipients.map((p) => {
+    const { subject, html, text } = composeFor('cancelled', opts, participantCtx(event, p), event);
+    return { to: p.email, subject, html, text };
+  });
+  const result = await sendBulk(messages);
+  await query(
+    `INSERT INTO event_emails (eventId, type, onceKey, subject, sentBy, recipients, sent, failed)
+     VALUES (:e,'cancelled',:k,:s,:by,:r,:sent,:f)`,
+    {
+      e: event.id,
+      k: `cancelled-${Date.now()}-${Math.floor(Math.random() * 1e6)}`.slice(0, 40),
+      s: `Cancelled: ${event.eventName}`.slice(0, 250),
+      by: userId,
+      r: result.total,
+      sent: result.sent,
+      f: result.failed,
+    }
+  );
+  return result;
 }
 
 // List events. Public sees upcoming + scheduled; admins can pass showAll=true.
@@ -220,7 +301,21 @@ router.put(
     validateDates(data.dateStart, data.dateEnd);
     await assertEventTypeExists(data.type);
 
-    await transaction(async (tx) => {
+    // The admin's reconciliation decision rides alongside the event data; zod
+    // strips unknown keys, so read it off the raw body.
+    const reconcile = req.body && typeof req.body.reconcile === 'object' ? req.body.reconcile : null;
+
+    // How far the event start moves (minutes); used to keep slot times aligned.
+    const oldStartUnix = mysqlToUnix(existing.dateStart);
+    const deltaMinutes = oldStartUnix == null ? 0 : Math.round((data.dateStart - oldStartUnix) / 60);
+
+    // Work out the side effects on existing bookings, and stop for the admin to
+    // confirm the disruptive ones before anything is written.
+    const effects = await computeSideEffects(existing, data, deltaMinutes);
+    const needsConfirm = effects.confirmPending > 0 || Boolean(effects.dateShift) || effects.cancelNotify > 0;
+    if (needsConfirm && !reconcile) throw new ApiError(409, 'event.reconcileRequired', effects);
+
+    const applied = await transaction(async (tx) => {
       await tx.query(
         `UPDATE events SET
           eventName=:eventName, description=:description, type=:type, status=:status,
@@ -257,11 +352,50 @@ router.put(
         }
       );
       await replaceAirports(tx, existing.id, data.airports);
+
+      // Confirmation turned off: nothing left to confirm, so provisional bookings
+      // become confirmed straight away.
+      let confirmedPending = 0;
+      if (truthy(existing.requireConfirmation) && !data.requireConfirmation) {
+        const r = await tx.query(
+          "UPDATE slots SET bookingStatus='booked' WHERE eventId=:e AND bookingStatus='prebooked'",
+          { e: existing.id }
+        );
+        confirmedPending = r?.affectedRows || 0;
+      }
+
+      // Event moved and the admin chose to keep the schedule aligned: shift every
+      // timed slot by the same amount (same pattern as the bulk "shift" action).
+      let slotsShifted = 0;
+      if (effects.dateShift && reconcile?.shiftSlots) {
+        const r = await tx.query(
+          'UPDATE slots SET slotTime=DATE_ADD(slotTime, INTERVAL :m MINUTE) WHERE eventId=:e AND slotTime IS NOT NULL',
+          { e: existing.id, m: effects.dateShift.deltaMinutes }
+        );
+        slotsShifted = r?.affectedRows || 0;
+      }
+
+      // Reminder rescheduled: clear the auto-send record so it can fire again.
+      if (effects.reminderRearm) {
+        await tx.query("DELETE FROM event_emails WHERE eventId=:e AND type='confirm-reminder'", { e: existing.id });
+      }
+
+      return { confirmedPending, slotsShifted };
     });
 
     await audit(req.user.id, 'update', 'event', existing.id);
     const updated = await queryOne('SELECT * FROM events WHERE id=:id', { id: existing.id });
-    res.json(await decorateEvent(updated));
+
+    // Cancellation emails go out AFTER commit (outside the tx) so a slow SMTP send
+    // never holds the row lock and a mail failure doesn't roll back the status.
+    let cancelEmails = 0;
+    if (data.status === 'cancelled' && existing.status !== 'cancelled') {
+      const r = await sendCancellationEmails(updated, req.user.id).catch(() => ({ sent: 0 }));
+      cancelEmails = r.sent || 0;
+    }
+
+    const decorated = await decorateEvent(updated);
+    res.json({ ...decorated, applied: { ...applied, cancelEmails, overLimit: effects.overLimit } });
   })
 );
 
