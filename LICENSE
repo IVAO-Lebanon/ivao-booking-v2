@@ -1,0 +1,30 @@
+Copyright (c) 2026 IVAO Lebanon (LB). All rights reserved.
+
+This software and its source code are the property of IVAO Lebanon.
+
+Ownership of this project — including the codebase, its history, and the
+canonical repository — remains with IVAO Lebanon at all times.
+
+Other IVAO divisions may be granted limited permission to deploy and run
+their own instance of this software, configured for their own division
+(division code, database, credentials, and branding), subject to the
+following conditions:
+
+  1. This copyright notice and ownership statement are retained in all
+     copies and deployments.
+  2. The software is used only to operate an IVAO division booking service.
+  3. No division claims ownership of, sublicenses, sells, or redistributes
+     the software or its source code.
+  4. Modifications to the shared codebase are contributed back to the
+     canonical repository (via pull request) rather than maintained as
+     independent forks.
+
+Any use, reproduction, or distribution outside the terms above requires the
+prior written permission of IVAO Lebanon.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE
+OR OTHER DEALINGS IN THE SOFTWARE.
