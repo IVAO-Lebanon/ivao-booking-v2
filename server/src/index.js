@@ -79,6 +79,86 @@ app.get('/health', async (_req, res) => {
   }
 });
 
+// Self-documenting API index at the root (GET /). A lightweight, Swagger-style
+// reference: JSON for API clients, a simple HTML page for browsers.
+const API_INFO = {
+  name: 'BYBLOS API',
+  description: 'Flight Booking System by IVAO Lebanon',
+  auth: 'Bearer JWT: Authorization: Bearer <token>',
+  groups: {
+    Health: ['GET  /health'],
+    Auth: [
+      'GET  /auth/config                     public OAuth config',
+      'POST /auth/ivao                       exchange IVAO code for a session JWT',
+      'POST /auth/dev                        dev login (dev only)',
+      'GET  /auth/me                         current user',
+    ],
+    Events: [
+      'GET    /event                         list (public: upcoming; admin: ?showAll=true)',
+      'GET    /event/:id                     single event',
+      'POST   /event                         create (admin)',
+      'PUT    /event/:id                     update, with reconcile (admin)',
+      'DELETE /event/:id                     delete (admin)',
+      'GET    /event/ivao/import             IVAO events for this division (admin)',
+      'GET    /event/:id/live                live network overlay',
+      'GET    /event/:id/export              bookings CSV (admin)',
+    ],
+    Slots: [
+      'GET   /event/:id/slot                 list slots (filters)',
+      'GET   /event/:id/slot/mine            my slots',
+      'GET   /event/:id/slot/count           counts by type',
+      'POST  /event/:id/slot                 create (admin)',
+      'POST  /event/:id/slot/many            CSV import (admin)',
+      'GET   /event/:id/slot/overlapping     overlap report (admin)',
+      'GET   /event/:id/slot/template        CSV template (admin)',
+      'POST  /event/:id/slot/bulk            bulk actions (admin)',
+      'PATCH /slot/:id/book|cancel|confirm   booking actions',
+      'PUT   /slot/:id  ·  DELETE /slot/:id   edit / delete (admin)',
+    ],
+    Email: [
+      'GET  /event/:id/email/status          counts + defaults + log (admin)',
+      'POST /event/:id/email/preview         HTML preview (admin)',
+      'POST /event/:id/email/send            send reminder/confirmReminder/notam/cancellation (admin)',
+      'POST /event/:id/email/test            send a test to yourself (admin)',
+      'GET  /event/:id/email/:eid/recipients per-recipient result (admin)',
+    ],
+    Reference: [
+      'GET /airport?search=                  airport typeahead (custom + IVAO)',
+      'GET /airport/:icao/brief              airport + METAR/TAF',
+      'GET /ref/aircraft?search=             aircraft typeahead',
+      'GET /ref/aircraft/:icao               single aircraft type',
+      'GET /ref/route?dep=&arr=              IVAO published routes',
+      'GET /ref/livery?airline=&aircraft=    livery lookup',
+    ],
+    'Custom data (admin)': [
+      'GET POST /custom/airport   ·  PUT DELETE /custom/airport/:icao',
+      'GET POST /custom/aircraft  ·  PUT DELETE /custom/aircraft/:icao',
+    ],
+    Lookups: [
+      'GET /event-type  ·  /scenery  ·  /simulator',
+      'GET /user (admin)  ·  GET /stats (admin)',
+    ],
+  },
+};
+
+app.get('/', (req, res) => {
+  const info = { ...API_INFO, division: config.division };
+  if (!String(req.headers.accept || '').includes('text/html')) return res.json(info);
+  const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const sections = Object.entries(info.groups)
+    .map(([title, items]) => `<h2>${esc(title)}</h2><pre>${items.map(esc).join('\n')}</pre>`)
+    .join('');
+  res.type('html').send(
+    `<!doctype html><meta charset="utf-8"><title>${esc(info.name)}</title>` +
+      `<style>body{font:14px/1.5 system-ui,sans-serif;max-width:900px;margin:2rem auto;padding:0 1rem;color:#191a23}` +
+      `h1{margin:0}h2{margin:1.4rem 0 .3rem;color:#0D2C99;font-size:15px}` +
+      `pre{background:#f4f5fa;border-radius:8px;padding:.8rem 1rem;overflow:auto;font-size:12.5px}` +
+      `.sub{color:#606282;margin:.2rem 0 1rem}a{color:#1037BF}</style>` +
+      `<h1>${esc(info.name)}</h1><p class="sub">${esc(info.description)} · IVAO ${esc(info.division)} · ${esc(info.auth)}</p>` +
+      sections
+  );
+});
+
 app.use('/auth', authRoutes);
 app.use('/event-type', eventTypeRoutes);
 app.use('/event', eventRoutes);
