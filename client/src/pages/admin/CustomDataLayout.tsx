@@ -12,7 +12,7 @@ export default function CustomDataLayout() {
   return (
     <div>
       <p className="mb-4 text-sm text-fuselage-500">
-        Reference data managed by your division. Custom airports and aircraft supplement the IVAO catalogue and, when
+        Reference data managed by your division. Custom airports and aircraft supplement the IVAO API and, when
         the ICAO matches, override it in the typeaheads and flight map.
       </p>
       <div className="mb-6 flex flex-wrap gap-1.5">

@@ -146,7 +146,7 @@ export default function CustomAirportsPage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-2">
-        <p className="text-sm text-fuselage-500">Airports not in the IVAO catalogue, or overrides for ones that are.</p>
+        <p className="text-sm text-fuselage-500">Airports not in the IVAO API, or overrides for ones that are.</p>
         <button className="btn-primary" onClick={() => setModal({ open: true, editing: null })}>
           <Plus size={16} /> Add airport
         </button>

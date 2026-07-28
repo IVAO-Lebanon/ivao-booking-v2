@@ -102,8 +102,10 @@ export function BookSlotModal({
   return (
     <Modal open onClose={onClose} title="Book this slot">
       <form onSubmit={submit} className="space-y-4">
-        <div className="rounded-lg bg-atmos-50 px-3 py-2 text-sm text-atmos-800 dark:bg-atmos-900/30 dark:text-atmos-200">
-          {event.eventName} · fields marked <span className="font-bold text-danger-500">*</span> are required. Empty fields are yours to choose; “fixed” fields are set by staff.
+        <div className="space-y-1 rounded-lg bg-atmos-50 px-3 py-2 text-sm text-atmos-800 dark:bg-atmos-900/30 dark:text-atmos-200">
+          <p>Fields marked <span className="font-bold text-danger-500">*</span> are required.</p>
+          <p>Empty fields are yours to fill in.</p>
+          <p>"Fixed" fields are already set and can't be changed.</p>
         </div>
 
         {event.bookingMessage && (

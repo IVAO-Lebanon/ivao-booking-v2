@@ -127,7 +127,7 @@ export default function CustomAircraftPage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-2">
-        <p className="text-sm text-fuselage-500">Aircraft types not in the IVAO catalogue, or overrides for ones that are.</p>
+        <p className="text-sm text-fuselage-500">Aircraft types not in the IVAO API, or overrides for ones that are.</p>
         <button className="btn-primary" onClick={() => setModal({ open: true, editing: null })}>
           <Plus size={16} /> Add aircraft
         </button>
@@ -136,7 +136,7 @@ export default function CustomAircraftPage() {
       {isLoading ? (
         <PageLoader />
       ) : !data || data.length === 0 ? (
-        <EmptyState title="No custom aircraft" hint="Add a type the IVAO catalogue is missing." />
+        <EmptyState title="No custom aircraft" hint="Add a type the IVAO API is missing." />
       ) : (
         <div className="space-y-2">
           {data.map((a) => (

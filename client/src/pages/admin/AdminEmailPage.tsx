@@ -31,10 +31,6 @@ export default function AdminEmailPage() {
       </div>
 
       <EmailPanel event={event} />
-      <p className="mt-2 text-xs text-fuselage-400">
-        Every email is sent by you (never automatically), can be sent again any time, and is personalised with each pilot's
-        current flight. The recipient list is recalculated from live bookings each time you send.
-      </p>
     </div>
   );
 }
