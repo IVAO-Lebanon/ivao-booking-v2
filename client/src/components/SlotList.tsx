@@ -1,5 +1,6 @@
 import { CSSProperties, FormEvent, useState } from 'react';
-import { Plane, Trash2, Pencil, Clock, X, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plane, Trash2, Pencil, Clock, X, AlertTriangle, LogIn } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
 import type { EventModel, Slot } from '../api/types';
@@ -195,17 +196,24 @@ export function SlotList({
   };
 
   function actionsFor(slot: Slot) {
+    const signedIn = Boolean(user);
     const isOwner = slot.pilotId != null && user?.id === slot.pilotId;
     const eventOpen = !event.hasEnded && event.status === 'scheduled';
-    const canBook = slot.bookingStatus === 'free' && eventOpen;
+    // Booking/claiming requires a signed-in pilot; hide the actions for guests.
+    const canBook = signedIn && slot.bookingStatus === 'free' && eventOpen;
     // A slot another pilot is holding but hasn't confirmed past the claim deadline.
-    const canClaim = Boolean(slot.claimable) && !isOwner && eventOpen;
+    const canClaim = signedIn && Boolean(slot.claimable) && !isOwner && eventOpen;
     return (
       <div className="flex flex-wrap items-center justify-end gap-1.5">
         {!manageMode && isOwner && slot.claimable && (
           <span className="inline-flex items-center gap-1 rounded-md bg-warning-100 px-2 py-1 text-[11px] font-semibold text-warning-700 dark:bg-warning-900/30 dark:text-warning-300">
             <AlertTriangle size={12} /> Confirm now - at risk
           </span>
+        )}
+        {!manageMode && !signedIn && slot.bookingStatus === 'free' && eventOpen && (
+          <Link to="/login" className="btn-secondary px-3 py-1.5 text-xs" title="Sign in with IVAO to book">
+            <LogIn size={13} /> Log in to book
+          </Link>
         )}
         {!manageMode && (canBook || canClaim) && (
           <button className="btn-primary px-3 py-1.5 text-xs" onClick={() => onBook(slot)} disabled={busy}>
