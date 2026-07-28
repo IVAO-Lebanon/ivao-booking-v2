@@ -1,4 +1,4 @@
-import { Radio, Plane, Headset, Wifi } from 'lucide-react';
+import { Radio, Plane, Headset } from 'lucide-react';
 import type { EventLive, LiveFlight } from '../api/types';
 
 export type LiveTone = 'green' | 'amber' | 'blue' | 'muted';
@@ -75,11 +75,11 @@ export function LiveEventBoard({ data }: { data: EventLive }) {
           )}
         </div>
 
+        {/* Event-relevant only: booked flights and ATC on this event's airports. */}
         <div className="relative flex flex-wrap gap-2 px-4 pb-4">
           <PulseTile icon={<Plane size={16} />} value={`${airborne}/${data.flights.length}`} label="Flights airborne" />
-          <PulseTile icon={<Radio size={16} />} value={tracked} label="On network" />
-          {c && <PulseTile icon={<Wifi size={16} />} value={c.pilots.toLocaleString()} label="Pilots online" />}
-          {c && <PulseTile icon={<Headset size={16} />} value={c.atc.toLocaleString()} label="ATC online" />}
+          <PulseTile icon={<Radio size={16} />} value={tracked} label="Booked online" />
+          <PulseTile icon={<Headset size={16} />} value={data.atc.length} label="ATC on station" />
         </div>
 
         {data.atc.length > 0 && (
