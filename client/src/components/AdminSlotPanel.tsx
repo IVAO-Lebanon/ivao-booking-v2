@@ -41,6 +41,10 @@ function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () =>
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
+          if (!f.slotTime) {
+            toast.error('Slot time is required.');
+            return;
+          }
           create.mutate();
         }}
         className="space-y-3"
@@ -71,8 +75,8 @@ function CreateSlotModal({ event, onClose }: { event: EventModel; onClose: () =>
             <input className="input font-mono uppercase" value={f.gate} onChange={set('gate')} placeholder="B4" />
           </div>
           <div>
-            <label className="label">Slot time (UTC)</label>
-            <DateTimeUtcInput value={f.slotTime} onChange={(v) => setF((s) => ({ ...s, slotTime: v }))} />
+            <label className="label">Slot time (UTC)<span className="ml-0.5 text-danger-500">*</span></label>
+            <DateTimeUtcInput value={f.slotTime} onChange={(v) => setF((s) => ({ ...s, slotTime: v }))} required />
           </div>
         </div>
         <div className="flex gap-2 pt-2">
@@ -137,7 +141,7 @@ const CSV_COLUMNS: { name: string; desc: string }[] = [
   { name: 'destination', desc: 'Arrival airport ICAO, e.g. LFPG.' },
   { name: 'aircraft', desc: 'Aircraft ICAO type, e.g. A320.' },
   { name: 'gate', desc: 'Gate / parking stand, e.g. B4.' },
-  { name: 'slotTime', desc: 'Slot time in UTC, format "YYYY-MM-DD HH:MM:SS".' },
+  { name: 'slotTime', desc: 'Required. Slot time in UTC, format "YYYY-MM-DD HH:MM:SS".' },
 ];
 
 function ImportCsvModal({
@@ -164,6 +168,7 @@ function ImportCsvModal({
           that value when booking. <b>Fill</b> a cell to fix it. Fixed values are staff-set and pilots can’t change
           them (shown to pilots with a <span className="font-bold text-danger-500">*</span>). A row with an open
           origin and/or destination becomes a <b>Private</b> slot; a full route is a Departure or Arrival.
+          <b> slotTime is required on every row.</b>
         </div>
 
         <div className="panel p-3">

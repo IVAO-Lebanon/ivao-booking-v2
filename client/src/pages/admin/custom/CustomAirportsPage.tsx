@@ -51,12 +51,25 @@ function AirportForm({ editing, onClose }: { editing: CustomAirport | null; onCl
 
   const num = (v: string) => (v.trim() === '' ? null : Number(v));
   const validate = (): string => {
-    if (!editing && !/^[A-Za-z]{4}$/.test(f.icao.trim())) return 'ICAO must be exactly 4 letters (A to Z).';
-    if (!f.name.trim()) return 'Enter an airport name.';
+    // ICAO (fixed once created)
+    if (!editing && !/^[A-Z]{4}$/.test(f.icao.trim())) return 'ICAO must be exactly 4 letters (A to Z).';
+    // IATA (optional)
+    if (f.iata.trim() && !/^[A-Z]{3}$/.test(f.iata.trim())) return 'IATA must be 3 letters (A to Z).';
+    // Name (required)
+    const name = f.name.trim();
+    if (!name) return 'Enter an airport name.';
+    if (name.length > 120) return 'Name is too long (max 120 characters).';
+    // City (optional)
+    if (f.city.trim().length > 120) return 'City is too long (max 120 characters).';
+    // Country (optional ISO 3166-1 alpha-2)
+    if (f.countryId.trim() && !/^[A-Z]{2}$/.test(f.countryId.trim())) return 'Country must be a 2-letter ISO code (e.g. LB).';
+    // Coordinates + elevation (optional)
     const lat = num(f.latitude);
     const lon = num(f.longitude);
     if (lat != null && (!Number.isFinite(lat) || lat < -90 || lat > 90)) return 'Latitude must be a number from -90 to 90.';
     if (lon != null && (!Number.isFinite(lon) || lon < -180 || lon > 180)) return 'Longitude must be a number from -180 to 180.';
+    // Both or neither: a single coordinate can't place a point on the map.
+    if ((lat == null) !== (lon == null)) return 'Enter both latitude and longitude, or leave both empty.';
     if (f.elevation.trim() && !Number.isInteger(Number(f.elevation))) return 'Elevation must be a whole number of feet.';
     return '';
   };
@@ -82,6 +95,7 @@ function AirportForm({ editing, onClose }: { editing: CustomAirport | null; onCl
               value={f.icao}
               onChange={(e) => setF((s) => ({ ...s, icao: e.target.value.toUpperCase() }))}
               placeholder="OLBB"
+              maxLength={4}
               disabled={!!editing}
               required
             />
@@ -89,17 +103,17 @@ function AirportForm({ editing, onClose }: { editing: CustomAirport | null; onCl
           </div>
           <div>
             <label className="label">IATA (optional)</label>
-            <input className="input font-mono uppercase" value={f.iata} onChange={(e) => setF((s) => ({ ...s, iata: e.target.value.toUpperCase() }))} placeholder="BEY" />
+            <input className="input font-mono uppercase" value={f.iata} onChange={(e) => setF((s) => ({ ...s, iata: e.target.value.toUpperCase() }))} placeholder="BEY" maxLength={3} />
           </div>
         </div>
         <div>
           <label className="label">Name</label>
-          <input className="input" value={f.name} onChange={set('name')} placeholder="Beirut Rafic Hariri Intl" required />
+          <input className="input" value={f.name} onChange={set('name')} placeholder="Beirut Rafic Hariri Intl" maxLength={120} required />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">City (optional)</label>
-            <input className="input" value={f.city} onChange={set('city')} placeholder="Beirut" />
+            <input className="input" value={f.city} onChange={set('city')} placeholder="Beirut" maxLength={120} />
           </div>
           <div>
             <label className="label">Country (ISO 2, optional)</label>

@@ -19,11 +19,20 @@ const aircraftIcao = z
   .nullable();
 
 // Accepts "YYYY-MM-DD HH:mm:ss" or ISO 8601.
+const dateTimePattern = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/;
 const dateTime = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/, 'Invalid date/time')
+  .regex(dateTimePattern, 'Invalid date/time')
   .optional()
   .nullable();
+
+// Required variant: every slot definition (form or CSV) must carry a slot time.
+// normalizeSlotInput turns empty strings into null, so map null/empty to undefined
+// to surface the friendly "required" message instead of a type error.
+const requiredDateTime = z.preprocess(
+  (v) => (v == null || (typeof v === 'string' && v.trim() === '') ? undefined : v),
+  z.string({ required_error: 'Slot time is required' }).regex(dateTimePattern, 'Invalid date/time')
+);
 
 export const authDevSchema = z.object({
   vid: z.string().regex(/^\d{4,8}$/, 'VID must be numeric'),
@@ -106,7 +115,7 @@ export const slotSchema = z.object({
     .regex(/^[A-Za-z0-9]{1,10}$/)
     .optional()
     .nullable(),
-  slotTime: dateTime,
+  slotTime: requiredDateTime,
   route: z.string().max(2000).optional().nullable(),
 });
 

@@ -70,9 +70,8 @@ export function BookSlotModal({
         {required && <span className="ml-0.5 text-danger-500">*</span>}
       </label>
       {fixed ? (
-        <div className="input flex items-center bg-fuselage-50 font-mono text-fuselage-500 dark:bg-fuselage-800/60">
-          {fixedValue || 'N/A'} <span className="ml-auto text-[10px] uppercase text-fuselage-400">fixed</span>
-        </div>
+        <div className="input flex items-center bg-fuselage-100 font-mono text-fuselage-500 dark:bg-fuselage-800 dark:text-fuselage-300">
+          {fixedValue || 'N/A'}        </div>
       ) : (
         <input
           className="input font-mono uppercase"
@@ -90,9 +89,8 @@ export function BookSlotModal({
     <div>
       <label className="label">{label}<span className="ml-0.5 text-danger-500">*</span></label>
       {fixed ? (
-        <div className="input flex items-center bg-fuselage-50 font-mono text-fuselage-500 dark:bg-fuselage-800/60">
-          {fixedValue || 'N/A'} <span className="ml-auto text-[10px] uppercase text-fuselage-400">fixed</span>
-        </div>
+        <div className="input flex items-center bg-fuselage-100 font-mono text-fuselage-500 dark:bg-fuselage-800 dark:text-fuselage-300">
+          {fixedValue || 'N/A'}        </div>
       ) : (
         <AirportInput value={(form[key] as string) || ''} onChange={(v) => setForm((f) => ({ ...f, [key]: v }))} placeholder={placeholder} required />
       )}
@@ -105,7 +103,7 @@ export function BookSlotModal({
         <div className="space-y-1 rounded-lg bg-atmos-50 px-3 py-2 text-sm text-atmos-800 dark:bg-atmos-900/30 dark:text-atmos-200">
           <p>Fields marked <span className="font-bold text-danger-500">*</span> are required.</p>
           <p>Empty fields are yours to fill in.</p>
-          <p>"Fixed" fields are already set and can't be changed.</p>
+          <p>Shaded fields are already set and can't be changed.</p>
         </div>
 
         {event.bookingMessage && (
@@ -133,9 +131,8 @@ export function BookSlotModal({
           <div>
             <label className="label">Aircraft (ICAO)</label>
             {slot.isFixedAircraft ? (
-              <div className="input flex items-center bg-fuselage-50 font-mono text-fuselage-500 dark:bg-fuselage-800/60">
-                {slot.aircraft || 'N/A'} <span className="ml-auto text-[10px] uppercase text-fuselage-400">fixed</span>
-              </div>
+              <div className="input flex items-center bg-fuselage-100 font-mono text-fuselage-500 dark:bg-fuselage-800 dark:text-fuselage-300">
+                {slot.aircraft || 'N/A'}              </div>
             ) : (
               <AircraftInput value={form.aircraft || ''} onChange={(v) => setForm((f) => ({ ...f, aircraft: v }))} />
             )}
@@ -149,22 +146,26 @@ export function BookSlotModal({
             Slot time (UTC)<span className="ml-0.5 text-danger-500">*</span>
           </label>
           {slot.isFixedSlotTime ? (
-            <div className="input flex items-center bg-fuselage-50 text-fuselage-500 dark:bg-fuselage-800/60">
-              {fmtUtc(slot.slotTime)} <span className="ml-auto text-[10px] uppercase text-fuselage-400">fixed</span>
-            </div>
+            <div className="input flex items-center bg-fuselage-100 text-fuselage-500 dark:bg-fuselage-800 dark:text-fuselage-300">
+              {fmtUtc(slot.slotTime)}            </div>
           ) : (
             <DateTimeUtcInput value={form.slotTime || ''} onChange={(v) => setForm((f) => ({ ...f, slotTime: v }))} required />
           )}
         </div>
 
         <div>
-          <label className="label">Gate (optional)</label>
-          <input
-            className="input font-mono uppercase"
-            placeholder={slot.gate || 'A1'}
-            value={form.gate || ''}
-            onChange={(e) => setForm((f) => ({ ...f, gate: e.target.value }))}
-          />
+          <label className="label">Gate{slot.gate ? '' : ' (optional)'}</label>
+          {slot.gate ? (
+            <div className="input flex items-center bg-fuselage-100 font-mono text-fuselage-500 dark:bg-fuselage-800 dark:text-fuselage-300">
+              {slot.gate}            </div>
+          ) : (
+            <input
+              className="input font-mono uppercase"
+              placeholder="A1"
+              value={form.gate || ''}
+              onChange={(e) => setForm((f) => ({ ...f, gate: e.target.value }))}
+            />
+          )}
         </div>
 
         <div className="flex gap-2 pt-2">

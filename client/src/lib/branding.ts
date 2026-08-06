@@ -9,6 +9,8 @@ export const APP_NAME = 'BYBLOS';
 export const APP_TAGLINE = 'Flight Booking System';
 /** Operating division, spelled out (used in taglines/footers). */
 export const APP_OPERATOR = 'IVAO Lebanon';
+/** Site creator, credited in the footer (name links to their IVAO profile). */
+export const APP_CREATOR = { name: 'Ahmad Dayeh', vid: '588679' };
 
 /** BYBLOS app icon (white cedar on brand navy) as an inline SVG data URI - used
  * for the browser favicon. Matches the "icon only" rendition of the Final 2A logo. */
@@ -23,6 +25,12 @@ export function faviconDataUri(): string {
     '<path d="M32 40 L68 40 L50 16 Z"/>' +
     '</g></svg>';
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/** A member's public IVAO profile page, e.g. vid "540147" → …/Member.aspx?Id=540147. */
+export function ivaoProfileUrl(vid?: string | null): string {
+  const v = (vid || '').trim();
+  return v ? `https://www.ivao.aero/Member.aspx?Id=${encodeURIComponent(v)}` : '';
 }
 
 /** Official IVAO division logo (SVG) for a division id, e.g. "LB" → …/LB.svg. */

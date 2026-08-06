@@ -198,13 +198,9 @@ export interface Paginated<T> {
 }
 
 export interface SlotCounts {
-  departure?: number;
-  landing?: number;
-  privateDeparture?: number;
-  privateLanding?: number;
-  total?: number;
-  booked?: number;
-  free?: number;
+  total: number;
+  booked: number;
+  free: number;
 }
 
 export interface LiveFlight {

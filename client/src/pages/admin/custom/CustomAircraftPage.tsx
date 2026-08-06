@@ -12,8 +12,11 @@ import { describeError } from '../../../lib/format';
 type Form = { icao: string; iata: string; model: string; manufacturer: string; wtc: string };
 const EMPTY: Form = { icao: '', iata: '', model: '', manufacturer: '', wtc: '' };
 
+// Radix Select forbids an item whose value is an empty string, so the "not set"
+// option uses a sentinel that maps to/from '' in the form state.
+const WTC_NONE = 'none';
 const WTC = [
-  { value: '', label: 'Not set' },
+  { value: WTC_NONE, label: 'Not set' },
   { value: 'L', label: 'L - Light' },
   { value: 'M', label: 'M - Medium' },
   { value: 'H', label: 'H - Heavy' },
@@ -46,8 +49,18 @@ function AircraftForm({ editing, onClose }: { editing: CustomAircraft | null; on
   });
 
   const validate = (): string => {
-    if (!editing && !/^[A-Za-z0-9]{2,4}$/.test(f.icao.trim())) return 'ICAO type must be 2 to 4 letters or digits.';
-    if (!f.model.trim()) return 'Enter a model name.';
+    // ICAO (fixed once created)
+    if (!editing && !/^[A-Z0-9]{2,4}$/.test(f.icao.trim())) return 'ICAO type must be 2 to 4 letters or digits.';
+    // IATA (optional, but must be well-formed if given)
+    if (f.iata.trim() && !/^[A-Z0-9]{2,4}$/.test(f.iata.trim())) return 'IATA must be 2 to 4 letters or digits.';
+    // Model (required)
+    const model = f.model.trim();
+    if (!model) return 'Enter a model name.';
+    if (model.length > 120) return 'Model must be 120 characters or fewer.';
+    // Manufacturer (optional)
+    if (f.manufacturer.trim().length > 120) return 'Manufacturer must be 120 characters or fewer.';
+    // Wake category (optional; must be one of the allowed codes)
+    if (f.wtc && !['L', 'M', 'H', 'J'].includes(f.wtc)) return 'Choose a valid wake category.';
     return '';
   };
 
@@ -72,6 +85,7 @@ function AircraftForm({ editing, onClose }: { editing: CustomAircraft | null; on
               value={f.icao}
               onChange={(e) => setF((s) => ({ ...s, icao: e.target.value.toUpperCase() }))}
               placeholder="A320"
+              maxLength={4}
               disabled={!!editing}
               required
             />
@@ -79,24 +93,24 @@ function AircraftForm({ editing, onClose }: { editing: CustomAircraft | null; on
           </div>
           <div>
             <label className="label">IATA (optional)</label>
-            <input className="input font-mono uppercase" value={f.iata} onChange={(e) => setF((s) => ({ ...s, iata: e.target.value.toUpperCase() }))} placeholder="320" />
+            <input className="input font-mono uppercase" value={f.iata} onChange={(e) => setF((s) => ({ ...s, iata: e.target.value.toUpperCase() }))} placeholder="320" maxLength={4} />
           </div>
         </div>
         <div>
           <label className="label">Model</label>
-          <input className="input" value={f.model} onChange={set('model')} placeholder="Airbus A320neo" required />
+          <input className="input" value={f.model} onChange={set('model')} placeholder="Airbus A320neo" maxLength={120} required />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Manufacturer (optional)</label>
-            <input className="input" value={f.manufacturer} onChange={set('manufacturer')} placeholder="Airbus" />
+            <input className="input" value={f.manufacturer} onChange={set('manufacturer')} placeholder="Airbus" maxLength={120} />
           </div>
           <div>
             <label className="label">Wake category (optional)</label>
             <Select
               items={WTC}
-              value={f.wtc}
-              onValueChange={(v: string) => setF((s) => ({ ...s, wtc: v }))}
+              value={f.wtc || WTC_NONE}
+              onValueChange={(v: string) => setF((s) => ({ ...s, wtc: v === WTC_NONE ? '' : v }))}
               placeholder="Not set"
               position="popper"
             />

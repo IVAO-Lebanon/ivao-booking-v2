@@ -46,6 +46,8 @@ router.patch(
     if (String(target.id) === String(req.user.id)) throw new ApiError(422, 'user.cannotSuspendSelf');
 
     const { suspended } = userUpdateSchema.parse(req.body);
+    // Admin accounts are never suspendable.
+    if (suspended && target.isAdmin) throw new ApiError(422, 'user.cannotSuspendAdmin');
     await query('UPDATE users SET suspended=:s WHERE id=:id', { s: suspended ? 1 : 0, id: target.id });
     await audit(req.user.id, suspended ? 'suspend' : 'unsuspend', 'user', target.id);
     res.json(normalizeUser(await queryOne('SELECT * FROM users WHERE id=:id', { id: target.id })));

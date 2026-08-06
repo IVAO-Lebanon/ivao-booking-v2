@@ -1,5 +1,5 @@
 import { CSSProperties, FormEvent, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useIvaoSignIn } from '../auth/useIvaoSignIn';
 import { Plane, Trash2, Pencil, Clock, X, AlertTriangle, LogIn } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, apiErrorMessage } from '../api/client';
@@ -71,7 +71,7 @@ function EditSlotModal({ event, slot, onClose }: { event: EventModel; slot: Slot
 
   return (
     <Modal open onClose={onClose} title={`Edit slot${slot.flightNumber ? ` · ${slot.flightNumber}` : ''}`}>
-      <form onSubmit={(e: FormEvent) => { e.preventDefault(); save.mutate(); }} className="space-y-3">
+      <form onSubmit={(e: FormEvent) => { e.preventDefault(); if (!f.slotTime) { toast.error('Slot time is required.'); return; } save.mutate(); }} className="space-y-3">
         <p className="rounded-lg bg-fuselage-100 px-3 py-2 text-xs text-fuselage-500 dark:bg-fuselage-800">
           A filled field is <b>fixed</b> (staff-set); an empty field stays pilot-fillable.
         </p>
@@ -97,8 +97,8 @@ function EditSlotModal({ event, slot, onClose }: { event: EventModel; slot: Slot
             <input className="input font-mono uppercase" value={f.gate} onChange={up('gate')} placeholder="B4" />
           </div>
           <div>
-            <label className="label">Slot time (UTC)</label>
-            <DateTimeUtcInput value={f.slotTime} onChange={(v) => setF((s) => ({ ...s, slotTime: v }))} />
+            <label className="label">Slot time (UTC)<span className="ml-0.5 text-danger-500">*</span></label>
+            <DateTimeUtcInput value={f.slotTime} onChange={(v) => setF((s) => ({ ...s, slotTime: v }))} required />
           </div>
         </div>
         <div className="flex gap-2 pt-2">
@@ -128,6 +128,7 @@ export function SlotList({
   live?: Record<string, LiveFlight>;
 }) {
   const { user } = useAuth();
+  const signIn = useIvaoSignIn();
   const toast = useToast();
   const askConfirm = useConfirm();
   const qc = useQueryClient();
@@ -211,9 +212,9 @@ export function SlotList({
           </span>
         )}
         {!manageMode && !signedIn && slot.bookingStatus === 'free' && eventOpen && (
-          <Link to="/login" className="btn-secondary px-3 py-1.5 text-xs" title="Sign in with IVAO to book">
+          <button type="button" onClick={signIn} className="btn-secondary px-3 py-1.5 text-xs" title="Sign in with IVAO to book">
             <LogIn size={13} /> Log in to book
-          </Link>
+          </button>
         )}
         {!manageMode && (canBook || canClaim) && (
           <button className="btn-primary px-3 py-1.5 text-xs" onClick={() => onBook(slot)} disabled={busy}>
@@ -314,7 +315,14 @@ export function SlotList({
       {slots.map((slot) => (
         <div
           key={slot.id}
-          className={`strip grid-cols-2 gap-x-3 gap-y-2 p-3 md:grid-cols-12 md:items-center md:py-2.5 ${
+          onClick={(e) => {
+            // Clicking anywhere on the row opens details, except on an actual control
+            // (Book / action buttons, links, the admin select checkbox). Keyboard/AT
+            // users reach the same action via the callsign button below.
+            if ((e.target as HTMLElement).closest('button, a, input, label, [role="checkbox"]')) return;
+            setDetail(slot);
+          }}
+          className={`strip cursor-pointer grid-cols-2 gap-x-3 gap-y-2 p-3 md:grid-cols-12 md:items-center md:py-2.5 ${
             selected.has(slot.id) ? 'ring-2 ring-atmos-400' : ''
           }`}
           style={{ ['--rail' as keyof CSSProperties]: statusRail(slot.bookingStatus) } as CSSProperties}

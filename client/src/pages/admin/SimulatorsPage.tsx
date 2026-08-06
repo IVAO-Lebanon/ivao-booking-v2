@@ -55,6 +55,7 @@ function SimulatorForm({ editing, onClose }: { editing: SimulatorModel | null; o
               value={f.code}
               onChange={(e) => setF((s) => ({ ...s, code: e.target.value.toLowerCase() }))}
               placeholder="msfs2024"
+              maxLength={16}
               disabled={!!editing}
               required
             />
@@ -72,7 +73,7 @@ function SimulatorForm({ editing, onClose }: { editing: SimulatorModel | null; o
         </div>
         <div>
           <label className="label">Name</label>
-          <input className="input" value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} placeholder="Microsoft Flight Simulator 2024" required />
+          <input className="input" value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} placeholder="Microsoft Flight Simulator 2024" maxLength={80} required />
         </div>
         <div className="flex gap-2 pt-2">
           <button type="button" className="btn-secondary flex-1" onClick={onClose}>Cancel</button>

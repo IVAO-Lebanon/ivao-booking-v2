@@ -88,6 +88,7 @@ const MESSAGES: Record<string, string> = {
   'simulator.notFound': 'Simulator not found.',
   'simulator.inUse': 'This simulator is used by existing sceneries. Reassign or delete them first.',
   'user.cannotSuspendSelf': 'You cannot suspend your own account.',
+  'user.cannotSuspendAdmin': 'Staff accounts cannot be suspended.',
   'validation.failed': 'Some fields are invalid. Please review your entries and try again.',
   'email.alreadySent': 'That email has already been sent for this event (one-time only).',
   'email.noRecipients': 'No recipients with an email address for this audience.',

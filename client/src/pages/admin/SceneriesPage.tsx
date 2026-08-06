@@ -55,7 +55,7 @@ function SceneryForm({ editing, onClose }: { editing: Scenery | null; onClose: (
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">ICAO</label>
-            <input className="input font-mono uppercase" value={f.icao} onChange={(e) => setF((s: any) => ({ ...s, icao: e.target.value.toUpperCase() }))} required />
+            <input className="input font-mono uppercase" value={f.icao} onChange={(e) => setF((s: any) => ({ ...s, icao: e.target.value.toUpperCase() }))} maxLength={4} required />
           </div>
           <div>
             <label className="label">Simulator</label>
@@ -70,7 +70,7 @@ function SceneryForm({ editing, onClose }: { editing: Scenery | null; onClose: (
         </div>
         <div>
           <label className="label">Title</label>
-          <input className="input" value={f.title} onChange={set('title')} required />
+          <input className="input" value={f.title} onChange={set('title')} maxLength={255} required />
         </div>
         <div>
           <label className="label">License</label>

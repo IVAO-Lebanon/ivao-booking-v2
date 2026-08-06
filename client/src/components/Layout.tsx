@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useIvaoSignIn } from '../auth/useIvaoSignIn';
 import { useTheme } from '../lib/theme';
 import { Sun, Moon, Menu, X } from 'lucide-react';
-import { IVAO_API_CREDIT, APP_NAME, APP_TAGLINE, APP_OPERATOR } from '../lib/branding';
+import { IVAO_API_CREDIT, APP_NAME, APP_TAGLINE, APP_OPERATOR, APP_CREATOR, ivaoProfileUrl } from '../lib/branding';
 import { CedarMark } from './logo';
 
 function UtcClock() {
@@ -47,8 +48,17 @@ export default function Layout() {
   const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const signIn = useIvaoSignIn();
 
   useEffect(() => setOpen(false), [location.pathname]);
+
+  // Clear the session, then land on the public home page (leaving a staff-only
+  // page would otherwise bounce through /login).
+  const handleSignOut = () => {
+    signOut();
+    navigate('/', { replace: true });
+  };
 
   const links = NAV.filter((n) => !n.auth || signed);
 
@@ -115,14 +125,14 @@ export default function Layout() {
                     {isAdmin && <span className="ml-1 text-atmos-600">· Staff</span>}
                   </div>
                 </div>
-                <button className="btn-secondary px-3 py-1.5" onClick={signOut}>
+                <button className="btn-secondary px-3 py-1.5" onClick={handleSignOut}>
                   Sign out
                 </button>
               </div>
             ) : (
-              <Link to="/login" className="btn-primary px-3 py-1.5">
+              <button className="btn-primary px-3 py-1.5" onClick={signIn}>
                 Sign in
-              </Link>
+              </button>
             )}
             <button className="btn-ghost p-2 md:hidden" onClick={() => setOpen((o) => !o)} aria-label="Menu">
               {open ? <X size={20} /> : <Menu size={20} />}
@@ -151,13 +161,13 @@ export default function Layout() {
               )}
               <div className="mt-2 border-t border-fuselage-200 pt-2 dark:border-fuselage-800">
                 {signed ? (
-                  <button className="btn-secondary w-full" onClick={signOut}>
+                  <button className="btn-secondary w-full" onClick={handleSignOut}>
                     Sign out ({user?.vid})
                   </button>
                 ) : (
-                  <Link to="/login" className="btn-primary w-full">
+                  <button className="btn-primary w-full" onClick={signIn}>
                     Sign in
-                  </Link>
+                  </button>
                 )}
               </div>
             </div>
@@ -170,17 +180,30 @@ export default function Layout() {
       </main>
 
       <footer className="mt-8 border-t border-fuselage-150 py-6 dark:border-fuselage-800">
-        <div className="mx-auto max-w-6xl px-4 text-center text-xs text-fuselage-400">
-          {APP_NAME} - {APP_TAGLINE} by {APP_OPERATOR}. Powered by the{' '}
-          <a
-            href={IVAO_API_CREDIT.url}
-            target="_blank"
-            rel="noreferrer"
-            className="font-semibold text-atmos-600 hover:underline dark:text-atmos-400"
-          >
-            {IVAO_API_CREDIT.label}
-          </a>
-          .
+        <div className="mx-auto max-w-6xl space-y-1 px-4 text-center text-xs text-fuselage-400">
+          <div className="font-semibold text-fuselage-500 dark:text-fuselage-300">
+            {APP_NAME} · {APP_TAGLINE}
+          </div>
+          <div>
+            Built by{' '}
+            <a
+              href={ivaoProfileUrl(APP_CREATOR.vid)}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-atmos-600 hover:underline dark:text-atmos-400"
+            >
+              {APP_CREATOR.name}
+            </a>{' '}
+            - {APP_OPERATOR} · Powered by the{' '}
+            <a
+              href={IVAO_API_CREDIT.url}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-atmos-600 hover:underline dark:text-atmos-400"
+            >
+              {IVAO_API_CREDIT.label}
+            </a>
+          </div>
         </div>
       </footer>
     </div>

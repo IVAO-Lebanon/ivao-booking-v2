@@ -37,7 +37,15 @@ async function addEvent(e) {
       dateStart: fmt(e.dateStart), dateEnd: fmt(e.dateEnd),
     }
   );
-  return r.insertId;
+  const eventId = r.insertId;
+  // Register the event's hub airport(s). Real events require these (they drive the
+  // Departures/Arrivals + Private slot counts for ops events, plus the Airports and
+  // recommended-sceneries panels), so every demo event gets them too.
+  const icaos = [...new Set((e.airports ?? []).map((a) => a.toUpperCase()))];
+  for (const icao of icaos) {
+    await query('INSERT INTO event_airports (eventId, icao) VALUES (:e,:i)', { e: eventId, i: icao });
+  }
+  return eventId;
 }
 
 const fx = (v) => (v !== undefined && v !== null && v !== '' ? 1 : 0);
@@ -78,7 +86,7 @@ async function main() {
   // 1) Instant booking + fixed/fillable + overlap + duplicate flight number + booking message
   {
     const start = at(3, 18); const s = S(start);
-    const id = await addEvent({ eventName: 'DEMO: Instant Booking', description: 'Bookings are instant (no confirmation). Tests fixed vs pilot-fillable fields, the overlap guard, and duplicate flight numbers.', type: 'rfe', dateStart: start, dateEnd: plus(start, 180), bookingMessage: 'Please file your flight plan and connect 10 minutes before your slot.' });
+    const id = await addEvent({ eventName: 'DEMO: Instant Booking', description: 'Bookings are instant (no confirmation). Tests fixed vs pilot-fillable fields, the overlap guard, and duplicate flight numbers.', type: 'rfe', dateStart: start, dateEnd: plus(start, 180), bookingMessage: 'Please file your flight plan and connect 10 minutes before your slot.', airports: ['EGLL'] });
     await addSlots(id, [
       s('BAW101', 'EGLL', 'LFPG', 'A320', 0, 'A1'),                 // fully fixed
       { origin: 'EGLL', slotTime: plus(start, 30) },                // origin fixed, everything else pilot-fillable
@@ -91,7 +99,7 @@ async function main() {
   // 2) Confirmation required, window OPEN now
   {
     const start = at(4, 17); const s = S(start);
-    const id = await addEvent({ eventName: 'DEMO: Confirmation Required', description: 'Bookings are provisional and must be confirmed. The confirmation window is already open.', type: 'rfe', dateStart: start, dateEnd: plus(start, 180), requireConfirmation: 1, confirmOpensHoursBefore: 8760, confirmDeadlineHours: 0 });
+    const id = await addEvent({ eventName: 'DEMO: Confirmation Required', description: 'Bookings are provisional and must be confirmed. The confirmation window is already open.', type: 'rfe', dateStart: start, dateEnd: plus(start, 180), requireConfirmation: 1, confirmOpensHoursBefore: 8760, confirmDeadlineHours: 0, airports: ['OLBA', 'EGLL'] });
     await addSlots(id, [ s('MEA211', 'OLBA', 'EGLL', 'A332', 0, 'C1'), s('BAW212', 'EGLL', 'OLBA', 'B77W', 30, 'C2') ]);
     summary.push(['DEMO: Confirmation Required', 'requireConfirmation=ON, confirmOpens=far, deadline=0', 'Book -> "Awaiting confirmation" (prebooked). A "Confirm" button is available now; confirm -> "Booked". Cancel also works.']);
   }
@@ -99,7 +107,7 @@ async function main() {
   // 3) Confirmation required, window NOT open yet
   {
     const start = at(12, 16); const s = S(start);
-    const id = await addEvent({ eventName: 'DEMO: Confirm Window Closed', description: 'Confirmation only opens 24h before the event, so it is not open yet.', type: 'rfe', dateStart: start, dateEnd: plus(start, 180), requireConfirmation: 1, confirmOpensHoursBefore: 24, confirmDeadlineHours: 0 });
+    const id = await addEvent({ eventName: 'DEMO: Confirm Window Closed', description: 'Confirmation only opens 24h before the event, so it is not open yet.', type: 'rfe', dateStart: start, dateEnd: plus(start, 180), requireConfirmation: 1, confirmOpensHoursBefore: 24, confirmDeadlineHours: 0, airports: ['LFPG', 'EDDF'] });
     await addSlots(id, [ s('AFR331', 'LFPG', 'EDDF', 'A320', 0, 'D1'), s('DLH332', 'EDDF', 'LFPG', 'A21N', 30, 'D2') ]);
     summary.push(['DEMO: Confirm Window Closed', 'requireConfirmation=ON, confirmOpens=24h before (event is ~12 days out)', 'Book -> prebooked, but NO "Confirm" button yet (window opens 24h before start). Confirm becomes available only within 24h of the event.']);
   }
@@ -107,7 +115,7 @@ async function main() {
   // 4) Claimable: unconfirmed slot past its claim deadline
   {
     const start = at(1, 15); const s = S(start);
-    const id = await addEvent({ eventName: 'DEMO: Claimable When Unconfirmed', description: 'The claim deadline has already passed, so any unconfirmed booking can be claimed by another pilot.', type: 'rfe', dateStart: start, dateEnd: plus(start, 180), requireConfirmation: 1, confirmOpensHoursBefore: 168, confirmDeadlineHours: 48 });
+    const id = await addEvent({ eventName: 'DEMO: Claimable When Unconfirmed', description: 'The claim deadline has already passed, so any unconfirmed booking can be claimed by another pilot.', type: 'rfe', dateStart: start, dateEnd: plus(start, 180), requireConfirmation: 1, confirmOpensHoursBefore: 168, confirmDeadlineHours: 48, airports: ['OLBA'] });
     await addSlots(id, [ s('UAE401', 'OMDB', 'OLBA', 'A388', 0, 'E1'), s('QTR402', 'OTHH', 'OLBA', 'A35K', 30, 'E2') ]);
     summary.push(['DEMO: Claimable When Unconfirmed', 'requireConfirmation=ON, deadline=48h (already past)', 'Book as Pilot A -> prebooked and immediately "at risk" (past deadline). Log in as Pilot B -> the slot shows a "Claim" button; claiming reassigns it. The holder can still Confirm to secure it.']);
   }
@@ -115,7 +123,7 @@ async function main() {
   // 5) One booking per pilot
   {
     const start = at(5, 18); const s = S(start);
-    const id = await addEvent({ eventName: 'DEMO: One Booking Per Pilot', description: 'Each pilot may hold at most one slot in this event.', type: 'rfe', dateStart: start, dateEnd: plus(start, 240), maxBookingsPerPilot: 1 });
+    const id = await addEvent({ eventName: 'DEMO: One Booking Per Pilot', description: 'Each pilot may hold at most one slot in this event.', type: 'rfe', dateStart: start, dateEnd: plus(start, 240), maxBookingsPerPilot: 1, airports: ['EGLL'] });
     await addSlots(id, [ s('BAW501', 'EGLL', 'LFPG', 'A320', 0, 'F1'), s('DLH502', 'EGLL', 'EDDF', 'A21N', 60, 'F2'), s('AFR503', 'EGLL', 'LFPG', 'A320', 120, 'F3') ]);
     summary.push(['DEMO: One Booking Per Pilot', 'maxBookingsPerPilot=1', 'Book one slot -> ok. Try to book a second -> blocked ("booking limit reached").']);
   }
@@ -123,7 +131,7 @@ async function main() {
   // 6) Open-route (private) slots
   {
     const start = at(6, 17); const s = S(start);
-    const id = await addEvent({ eventName: 'DEMO: Open-Route (Private) Slots', description: 'Slots with an open origin or destination that the pilot fills in.', type: 'mse', dateStart: start, dateEnd: plus(start, 240) });
+    const id = await addEvent({ eventName: 'DEMO: Open-Route (Private) Slots', description: 'Slots with an open origin or destination that the pilot fills in.', type: 'mse', dateStart: start, dateEnd: plus(start, 240), airports: ['OLBA'] });
     await addSlots(id, [
       { origin: 'OLBA', slotTime: plus(start, 0), gate: 'G1' },      // origin fixed OLBA, destination open -> private
       { destination: 'OLBA', slotTime: plus(start, 30), gate: 'G2' },// destination fixed OLBA, origin open -> private
@@ -135,7 +143,7 @@ async function main() {
   // 7) RFO directional (departures / arrivals)
   {
     const start = at(7, 18); const s = S(start);
-    const id = await addEvent({ eventName: 'DEMO: RFO Directional', description: 'Real Flight Operations from/to OLBA with directional departure and arrival slots.', type: 'rfo', dateStart: start, dateEnd: plus(start, 300) });
+    const id = await addEvent({ eventName: 'DEMO: RFO Directional', description: 'Real Flight Operations from/to OLBA with directional departure and arrival slots.', type: 'rfo', dateStart: start, dateEnd: plus(start, 300), airports: ['OLBA'] });
     await addSlots(id, [
       s('MEA701', 'OLBA', 'OMDB', 'A332', 0, 'H1'),   // departure (OLBA out)
       s('MEA702', 'OLBA', 'LTFM', 'A321', 20, 'H2'),  // departure
@@ -149,7 +157,7 @@ async function main() {
   {
     const start = at(-0.05, new Date().getUTCHours()); // ~1h ago
     const s = S(start);
-    const id = await addEvent({ eventName: 'DEMO: In Progress (late booking allowed)', description: 'The event has already started; booking after start is allowed here.', type: 'rfe', dateStart: at(-1 / 24, new Date().getUTCHours()), dateEnd: plus(new Date(), 180), allowBookingAfterStart: 1 });
+    const id = await addEvent({ eventName: 'DEMO: In Progress (late booking allowed)', description: 'The event has already started; booking after start is allowed here.', type: 'rfe', dateStart: at(-1 / 24, new Date().getUTCHours()), dateEnd: plus(new Date(), 180), allowBookingAfterStart: 1, airports: ['EGLL'] });
     await addSlots(id, [ s('BAW801', 'EGLL', 'LFPG', 'A320', 30, 'J1'), s('DLH802', 'EGLL', 'EDDF', 'A21N', 60, 'J2') ]);
     summary.push(['DEMO: In Progress (late booking allowed)', 'started already, allowBookingAfterStart=ON', 'Event shows LIVE / in progress; you can still book. (To see the opposite, edit an in-progress event and turn allowBookingAfterStart OFF -> booking is blocked.)']);
   }
@@ -157,7 +165,7 @@ async function main() {
   // 9) Hidden (non-public) event
   {
     const start = at(8, 18); const s = S(start);
-    const id = await addEvent({ eventName: 'DEMO: Hidden (staff only)', description: 'Not public: only staff can see this event; pilots cannot list or open it.', type: 'rfe', dateStart: start, dateEnd: plus(start, 180), publicAccess: 0 });
+    const id = await addEvent({ eventName: 'DEMO: Hidden (staff only)', description: 'Not public: only staff can see this event; pilots cannot list or open it.', type: 'rfe', dateStart: start, dateEnd: plus(start, 180), publicAccess: 0, airports: ['OLBA'] });
     await addSlots(id, [ s('MEA901', 'OLBA', 'LCLK', 'A320', 0, 'K1') ]);
     summary.push(['DEMO: Hidden (staff only)', 'publicAccess=OFF', 'Admins see it in the events list; pilots do NOT (hidden from the public list, and opening its URL gives 404).']);
   }
@@ -165,7 +173,7 @@ async function main() {
   // 10) Cancelled event
   {
     const start = at(9, 18); const s = S(start);
-    const id = await addEvent({ eventName: 'DEMO: Cancelled Event', description: 'This event is cancelled.', type: 'rfe', status: 'cancelled', dateStart: start, dateEnd: plus(start, 180) });
+    const id = await addEvent({ eventName: 'DEMO: Cancelled Event', description: 'This event is cancelled.', type: 'rfe', status: 'cancelled', dateStart: start, dateEnd: plus(start, 180), airports: ['OLBA'] });
     await addSlots(id, [ s('AFR1001', 'LFPG', 'OLBA', 'A332', 0, 'L1') ]);
     summary.push(['DEMO: Cancelled Event', 'status=cancelled', 'Hidden from the public events list; admins still see it (status Cancelled). Sending a Cancellation notice is a manual action on its Email page.']);
   }

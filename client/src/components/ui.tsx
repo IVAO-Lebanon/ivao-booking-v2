@@ -69,15 +69,18 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
 // One source of truth for every booking/event status: a human label, badge
 // styles, and the rail colour used on flight strips. Labels use the operator's
 // vocabulary rather than the raw DB enum ("Open" reads clearer than "free").
-type StatusMeta = { label: string; badge: string; rail: string };
+// `badge` is for on-surface use (adapts to light/dark). `onImage` is for badges
+// overlaid on a banner image, which stays the same in both themes — so it uses a
+// solid white pill with dark, status-tinted text that reads on any photo.
+type StatusMeta = { label: string; badge: string; onImage: string; rail: string };
 const STATUS_META: Record<string, StatusMeta> = {
-  free: { label: 'Open', badge: 'bg-success-50 text-success-700 dark:bg-success-900/30 dark:text-success-300', rail: '#2EC662' },
-  prebooked: { label: 'Awaiting', badge: 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-300', rail: '#E6B507' },
-  booked: { label: 'Booked', badge: 'bg-atmos-100 text-atmos-700 dark:bg-atmos-900/40 dark:text-atmos-300', rail: '#1342E4' },
-  scheduled: { label: 'Scheduled', badge: 'bg-atmos-100 text-atmos-700 dark:bg-atmos-900/40 dark:text-atmos-300', rail: '#1342E4' },
-  created: { label: 'Draft', badge: 'bg-fuselage-150 text-fuselage-600 dark:bg-fuselage-800 dark:text-fuselage-300', rail: '#a7a8bb' },
-  finished: { label: 'Finished', badge: 'bg-fuselage-200 text-fuselage-500 dark:bg-fuselage-800 dark:text-fuselage-400', rail: '#8b8ca9' },
-  cancelled: { label: 'Cancelled', badge: 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-300', rail: '#E93434' },
+  free: { label: 'Open', badge: 'bg-success-50 text-success-700 dark:bg-success-900/30 dark:text-success-300', onImage: 'text-success-700', rail: '#2EC662' },
+  prebooked: { label: 'Awaiting', badge: 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-300', onImage: 'text-warning-700', rail: '#E6B507' },
+  booked: { label: 'Booked', badge: 'bg-atmos-100 text-atmos-700 dark:bg-atmos-900/40 dark:text-atmos-300', onImage: 'text-atmos-700', rail: '#1342E4' },
+  scheduled: { label: 'Scheduled', badge: 'bg-atmos-100 text-atmos-700 dark:bg-atmos-900/40 dark:text-atmos-300', onImage: 'text-atmos-700', rail: '#1342E4' },
+  created: { label: 'Draft', badge: 'bg-fuselage-150 text-fuselage-600 dark:bg-fuselage-800 dark:text-fuselage-300', onImage: 'text-fuselage-600', rail: '#a7a8bb' },
+  finished: { label: 'Finished', badge: 'bg-fuselage-200 text-fuselage-500 dark:bg-fuselage-800 dark:text-fuselage-400', onImage: 'text-fuselage-600', rail: '#8b8ca9' },
+  cancelled: { label: 'Cancelled', badge: 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-300', onImage: 'text-danger-700', rail: '#E93434' },
 };
 
 const fallbackMeta: StatusMeta = STATUS_META.free;
@@ -86,9 +89,10 @@ export function statusRail(status: string): string {
   return (STATUS_META[status] ?? fallbackMeta).rail;
 }
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, onImage = false }: { status: string; onImage?: boolean }) {
   const meta = STATUS_META[status] ?? fallbackMeta;
-  return <span className={`badge badge-dot ${meta.badge}`}>{meta.label}</span>;
+  const style = onImage ? `bg-white/90 backdrop-blur ${meta.onImage}` : meta.badge;
+  return <span className={`badge badge-dot ${style}`}>{meta.label}</span>;
 }
 
 // Backed by Atmosphere's Radix Dialog (focus-trap, Esc-to-close, scroll-lock,

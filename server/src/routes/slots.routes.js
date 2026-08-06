@@ -129,12 +129,19 @@ function shapeSlot(row, opts = {}) {
 }
 
 /* ─────────────────────────── COUNTS ─────────────────────────── */
+// Booked vs available, for every event type. Directional (departure/arrival)
+// counts were fragile - they read 0/0 for events flying between multiple hub
+// airports, or with no hub airports registered - so we report the one thing that
+// is always well-defined for a slot: whether it's taken.
 router.get(
   '/event/:eventId/slot/count',
   asyncHandler(async (req, res) => {
     const event = await getEventOr404(req.params.eventId);
-    const rule = await ruleFor(event.type);
-    res.json(await rule.getCounts(event.id));
+    const total = (await query('SELECT COUNT(*) c FROM slots WHERE eventId=:e', { e: event.id }))[0].c;
+    const booked = (
+      await query("SELECT COUNT(*) c FROM slots WHERE eventId=:e AND bookingStatus<>'free'", { e: event.id })
+    )[0].c;
+    res.json({ total, booked, free: total - booked });
   })
 );
 

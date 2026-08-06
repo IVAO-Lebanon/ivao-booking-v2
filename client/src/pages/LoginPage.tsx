@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { buildIvaoAuthUrl } from '../auth/useIvaoSignIn';
 import { useToast } from '../components/Toast';
 import { Switch } from '@ivao/atmosphere-react';
 import { Spinner } from '../components/ui';
@@ -13,12 +14,9 @@ export default function LoginPage() {
   const { config, devLogin, signed } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const manual = params.get('manual') === '1'; // came back to choose manually
   const [vid, setVid] = useState('540001');
   const [admin, setAdmin] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     if (signed) navigate('/', { replace: true });
@@ -38,48 +36,17 @@ export default function LoginPage() {
     }
   };
 
+  // No auto-redirect here: bouncing to IVAO on mount silently re-logs the user in
+  // right after they sign out (the IVAO SSO session is still live). Sign-in is
+  // initiated explicitly from the "Sign in" buttons instead.
   const ivaoSignIn = () => {
-    const clientId = import.meta.env.VITE_IVAO_CLIENT_ID || config?.clientId;
-    const redirectUri = import.meta.env.VITE_IVAO_REDIRECT_URI || `${window.location.origin}/login/callback`;
-    const authEndpoint = config?.openId?.authorizationEndpoint;
-    if (!clientId || !authEndpoint) {
+    const url = buildIvaoAuthUrl(config);
+    if (!url) {
       toast.error('IVAO SSO is not configured on this server.');
       return;
     }
-    const query = new URLSearchParams({
-      response_type: 'code',
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      scope: 'profile email',
-    });
-    window.location.href = `${authEndpoint}?${query.toString()}`;
+    window.location.href = url;
   };
-
-  const ivaoConfigured = Boolean(
-    (import.meta.env.VITE_IVAO_CLIENT_ID || config?.clientId) && config?.openId?.authorizationEndpoint
-  );
-
-  // In production (dev login disabled) go straight to IVAO when the user hits
-  // /login, unless they returned to choose manually or SSO isn't configured. The
-  // timestamp guard prevents a redirect loop if the IVAO round-trip fails.
-  useEffect(() => {
-    if (!config || signed || config.devAuth || manual || !ivaoConfigured) return;
-    const last = Number(sessionStorage.getItem('ivao_auto_at') || 0);
-    if (Date.now() - last < 15_000) return;
-    sessionStorage.setItem('ivao_auto_at', String(Date.now()));
-    setRedirecting(true);
-    ivaoSignIn();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config, signed, manual, ivaoConfigured]);
-
-  if (redirecting) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
-        <Spinner className="h-8 w-8 text-atmos-600" />
-        <p className="text-sm text-fuselage-500">Redirecting to IVAO…</p>
-      </div>
-    );
-  }
 
   return (
     <div className="mx-auto max-w-md py-8">

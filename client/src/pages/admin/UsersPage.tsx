@@ -69,6 +69,8 @@ export default function UsersPage() {
                 <div className="ml-auto">
                   {me?.id === u.id ? (
                     <span className="text-xs text-fuselage-400">You</span>
+                  ) : u.isAdmin ? (
+                    <span className="text-xs text-fuselage-400">Staff</span>
                   ) : u.suspended ? (
                     <button className="btn-secondary px-3 py-1.5 text-xs" onClick={() => toggle.mutate({ user: u, suspended: false })}>
                       Reinstate

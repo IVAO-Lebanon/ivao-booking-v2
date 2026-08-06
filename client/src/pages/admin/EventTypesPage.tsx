@@ -58,6 +58,7 @@ function TypeForm({ editing, onClose }: { editing: EventTypeModel | null; onClos
               value={f.code}
               onChange={(e) => setF((s) => ({ ...s, code: e.target.value.toLowerCase() }))}
               placeholder="rfo"
+              maxLength={16}
               disabled={!!editing}
               required
             />
@@ -75,11 +76,11 @@ function TypeForm({ editing, onClose }: { editing: EventTypeModel | null; onClos
         </div>
         <div>
           <label className="label">Name</label>
-          <input className="input" value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} placeholder="Real Flight Operations" required />
+          <input className="input" value={f.name} onChange={(e) => setF((s) => ({ ...s, name: e.target.value }))} placeholder="Real Flight Operations" maxLength={80} required />
         </div>
         <div>
           <label className="label">Description</label>
-          <input className="input" value={f.description} onChange={(e) => setF((s) => ({ ...s, description: e.target.value }))} placeholder="Short summary shown to staff." />
+          <input className="input" value={f.description} onChange={(e) => setF((s) => ({ ...s, description: e.target.value }))} placeholder="Short summary shown to staff." maxLength={255} />
         </div>
         <label className="flex items-start gap-2 rounded-lg bg-fuselage-50 p-3 text-sm dark:bg-fuselage-800/60">
           <Switch className="mt-0.5" checked={f.opsSlots} onCheckedChange={(v) => setF((s) => ({ ...s, opsSlots: v }))} />

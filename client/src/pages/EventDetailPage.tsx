@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowLeft, Headphones, FileText, Ticket, Wrench } from 'lucide-react';
+import { ArrowLeft, Headphones, FileText, Ticket, Wrench, ExternalLink } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -10,6 +10,7 @@ import { SlotList } from '../components/SlotList';
 import { BookSlotModal } from '../components/BookSlotModal';
 import { LiveEventBoard } from '../components/LiveEventBoard';
 import { useAuth } from '../auth/AuthContext';
+import { useIvaoSignIn } from '../auth/useIvaoSignIn';
 import { fmtDateUtc, fmtTimeUtc } from '../lib/format';
 
 type Tab = 'all' | 'mine';
@@ -25,6 +26,7 @@ export default function EventDetailPage() {
   const { id } = useParams();
   const eventId = Number(id);
   const { signed, isAdmin } = useAuth();
+  const signIn = useIvaoSignIn();
 
   const [tab, setTab] = useState<Tab>('all');
   const [page, setPage] = useState(1);
@@ -148,17 +150,8 @@ export default function EventDetailPage() {
             )}
             {counts && (
               <div className="grid grid-cols-2 gap-2 text-center">
-                {'departure' in counts ? (
-                  <>
-                    <Stat label="Departures" value={counts.departure ?? 0} />
-                    <Stat label="Arrivals" value={counts.landing ?? 0} />
-                  </>
-                ) : (
-                  <>
-                    <Stat label="Free" value={counts.free ?? 0} />
-                    <Stat label="Booked" value={counts.booked ?? 0} />
-                  </>
-                )}
+                <Stat label="Booked" value={counts.booked ?? 0} />
+                <Stat label="Available" value={counts.free ?? 0} />
               </div>
             )}
           </div>
@@ -177,6 +170,7 @@ export default function EventDetailPage() {
                   className="badge bg-atmos-50 text-atmos-700 hover:bg-atmos-100 dark:bg-atmos-900/30 dark:text-atmos-300"
                 >
                   {s.icao} · {s.title} · {s.simulator} ({s.license})
+                  <ExternalLink size={12} className="shrink-0 opacity-70" aria-hidden />
                 </a>
               ))}
             </div>
@@ -262,9 +256,9 @@ export default function EventDetailPage() {
           <div className="mb-4 flex items-center gap-3 rounded-xl border border-atmos-100 bg-atmos-50 px-4 py-3 text-sm text-atmos-800 dark:border-atmos-900/50 dark:bg-atmos-900/20 dark:text-atmos-200">
             <Ticket size={20} className="shrink-0 text-atmos-600 dark:text-atmos-400" aria-hidden />
             <span>
-              <Link to="/login" className="font-bold underline underline-offset-2">
+              <button type="button" onClick={signIn} className="font-bold underline underline-offset-2">
                 Sign in
-              </Link>{' '}
+              </button>{' '}
               with your IVAO account to book a slot.
             </span>
           </div>

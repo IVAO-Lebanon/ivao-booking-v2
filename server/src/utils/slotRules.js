@@ -32,41 +32,12 @@ const rfoRule = {
         return { sql: '', params: {} };
     }
   },
-
-  async getCounts(eventId) {
-    const icaos = await eventIcaos(eventId);
-    if (icaos.length === 0) return { departure: 0, landing: 0, privateDeparture: 0, privateLanding: 0 };
-    const inList = icaos.map((_, i) => `:ic${i}`).join(',');
-    const p = Object.fromEntries(icaos.map((ic, i) => [`ic${i}`, ic]));
-
-    const one = async (sql) => (await query(sql, { e: eventId, ...p }))[0].c;
-    const departure = await one(
-      `SELECT COUNT(*) c FROM slots WHERE eventId=:e AND origin IN (${inList}) AND destination NOT IN (${inList}) AND isPrivate=0`
-    );
-    const landing = await one(
-      `SELECT COUNT(*) c FROM slots WHERE eventId=:e AND destination IN (${inList}) AND origin NOT IN (${inList}) AND isPrivate=0`
-    );
-    const privateDeparture = await one(
-      `SELECT COUNT(*) c FROM slots WHERE eventId=:e AND isFixedOrigin=1 AND isFixedDestination=0 AND isPrivate=1`
-    );
-    const privateLanding = await one(
-      `SELECT COUNT(*) c FROM slots WHERE eventId=:e AND isFixedOrigin=0 AND isFixedDestination=1 AND isPrivate=1`
-    );
-    return { departure, landing, privateDeparture, privateLanding };
-  },
 };
 
 // Default rule for non-ops events - no special type filtering.
 const defaultRule = {
   async buildTypeFilter() {
     return { sql: '', params: {} };
-  },
-  async getCounts(eventId) {
-    const total = (await query('SELECT COUNT(*) c FROM slots WHERE eventId=:e', { e: eventId }))[0].c;
-    const booked = (
-      await query("SELECT COUNT(*) c FROM slots WHERE eventId=:e AND bookingStatus<>'free'", { e: eventId })
-    )[0].c;
-    return { total, booked, free: total - booked };
   },
 };
 
